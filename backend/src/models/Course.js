@@ -1,0 +1,47 @@
+const mongoose = require('mongoose');
+
+const courseSchema = new mongoose.Schema({
+  id: { type: String, unique: true, index: true },
+  title: { type: String, required: true },
+  slug: { type: String, required: true, unique: true },
+  category: String,
+  shortDescription: String,
+  fullDescription: String,
+  thumbnail: String,
+  bannerImage: String,
+  totalDuration: String,
+  lessonsCount: Number,
+  isFree: Boolean,
+  monthUnlock: Number,
+  level: String,
+  rating: Number,
+  reviewsCount: Number,
+  instructor: {
+    name: String, title: String, avatar: String, experience: String
+  },
+  modules: [{
+    id: String,
+    title: String,
+    lessons: [{
+      id: String, title: String, duration: String, durationSeconds: Number,
+      videoUrl: String, videoUrls: { type: [String], default: [] }, description: String, keyPoints: [String], order: Number
+    }]
+  }],
+  resources: [{
+    id: String, title: String, type: String, fileName: String, fileSize: String,
+    category: String, downloadUrl: String, contentSummary: String, published: { type: Boolean, default: false }
+  }],
+  assignments: [{
+    id: String, title: String, dueDate: String, points: Number, description: String,
+    guidelines: [String]
+  }],
+  quiz: {
+    id: String, title: String, durationMinutes: Number, passingScorePercentage: Number,
+    questions: [{
+      id: String, question: String, options: [String], correctAnswer: Number, explanation: String
+    }]
+  },
+  learningOutcomes: [String]
+}, { timestamps: true });
+
+module.exports = mongoose.model('Course', courseSchema);

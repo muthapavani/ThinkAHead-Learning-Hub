@@ -1,0 +1,97 @@
+{
+  "id": "course-23-example",
+  "title": "Strategic Thinking & Decision Making",
+  "slug": "strategic-thinking-decision-making",
+  "category": "Professional Skills",
+  "shortDescription": "Build structured thinking and make confident, evidence-based decisions.",
+  "fullDescription": "A practical program covering problem framing, prioritisation, scenario analysis and decision communication.",
+  "thumbnail": "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&auto=format&fit=crop&q=80",
+  "bannerImage": "https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200&auto=format&fit=crop&q=80",
+  "totalDuration": "8h 30m",
+  "lessonsCount": 16,
+  "isFree": false,
+  "monthUnlock": 3,
+  "level": "Intermediate",
+  "rating": 4.8,
+  "reviewsCount": 320,
+  "instructor": {
+    "name": "G. Satyanarayana",
+    "title": "Founder Director, IHCDR",
+    "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80",
+    "experience": "35+ Years Senior Industrial Leadership"
+  },
+  "learningOutcomes": [
+    "Frame complex problems",
+    "Compare strategic options",
+    "Communicate decisions clearly"
+  ],
+  "modules": [
+    {
+      "id": "mod-23-1",
+      "title": "Module 1: Strategic Decision Foundations",
+      "lessons": [
+        {
+          "id": "les-23-1-1",
+          "title": "Problem Framing",
+          "duration": "25m",
+          "durationSeconds": 1500,
+          "videoUrl": "https://example.com/video",
+          "description": "Learn a repeatable problem-framing process.",
+          "keyPoints": [
+            "Define the decision",
+            "Identify constraints",
+            "Set success criteria"
+          ],
+          "order": 1
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "id": "res-23-1",
+      "title": "Decision Framework Worksheet",
+      "type": "worksheet",
+      "fileName": "decision-framework.pdf",
+      "fileSize": "420 KB",
+      "category": "Course Worksheet",
+      "downloadUrl": "/resources/decision-framework.pdf",
+      "contentSummary": "A worksheet for structuring strategic decisions.",
+      "published": true
+    }
+  ],
+  "assignments": [
+    {
+      "id": "ass-23-1",
+      "title": "Decision Case Study",
+      "dueDate": "2026-10-15",
+      "points": 100,
+      "description": "Analyse a short business decision case.",
+      "guidelines": [
+        "Frame the problem",
+        "Compare at least two options",
+        "Recommend one option"
+      ]
+    }
+  ],
+  "quiz": {
+    "id": "quiz-23",
+    "title": "Strategic Thinking Check",
+    "durationMinutes": 15,
+    "passingScorePercentage": 70,
+    "questions": [
+      {
+        "id": "q23-1",
+        "question": "What should be defined before comparing options?",
+        "options": [
+          "Decision criteria",
+          "Final answer",
+          "Certificate number",
+          "Course rating"
+        ],
+        "correctAnswer": 0,
+        "explanation": "Decision criteria make option comparison objective."
+      }
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "ThinkAHead Learning Hub",
+  "description": "Institute of Human Capability Development and Research - A comprehensive Learning Management System featuring landing pages, student portals, interactive video lessons, quizzes, certificates, and admin control.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

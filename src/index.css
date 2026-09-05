@@ -1,0 +1,369 @@
+@import "tailwindcss";
+
+/* App toggles a `.dark` class on <html>; wire Tailwind's dark: variant to it
+   so components can pair a light-mode color with a dark-mode color instead
+   of hard-coding one palette that breaks in the other theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  ::selection {
+    background-color: rgba(37, 99, 235, 0.35);
+    color: inherit;
+  }
+}
+
+.text-gradient-brand {
+  background: linear-gradient(90deg, #2563eb, #0ea5e9, #10b981);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: floatSlow 5s ease-in-out infinite;
+}
+
+@keyframes pulseSlow {
+  0%, 100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 4.5s ease-in-out infinite;
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-certificate, #printable-certificate * {
+    visibility: visible;
+  }
+  #printable-certificate {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+
+/* Light-theme contrast corrections: components keep their existing layout while
+   muted dark-mode utility colors become readable on light surfaces. */
+.light-theme .text-slate-400 { color: #475569 !important; }
+.light-theme .text-slate-500 { color: #475569 !important; }
+.light-theme .text-slate-600 { color: #334155 !important; }
+.light-theme .text-slate-700 { color: #1e293b !important; }
+.light-theme .border-slate-800 { border-color: #cbd5e1 !important; }
+.light-theme .border-slate-700 { border-color: #cbd5e1 !important; }
+.light-theme .bg-slate-900\/80 { background-color: rgba(255,255,255,.96) !important; }
+.light-theme .bg-slate-900\/60 { background-color: rgba(255,255,255,.92) !important; }
+.light-theme .bg-slate-800\/40 { background-color: rgba(241,245,249,.92) !important; }
+.light-theme .hover\:bg-slate-800:hover { background-color: #e2e8f0 !important; }
+.light-theme .hover\:bg-slate-700:hover { background-color: #cbd5e1 !important; }
+
+/* Landing-page brand treatment for dashboard actions */
+.dashboard-shell button[class*="bg-indigo-600"],
+.dashboard-shell button[class*="bg-blue-600"],
+.dashboard-shell button[class*="bg-emerald-600"],
+.dashboard-shell button[class*="bg-purple-600"],
+.dashboard-shell button[class*="bg-cyan-600"] {
+  background-image: linear-gradient(90deg, #2563eb, #06b6d4, #10b981) !important;
+  background-color: transparent !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+.dashboard-shell button[class*="bg-indigo-600"]:hover,
+.dashboard-shell button[class*="bg-blue-600"]:hover,
+.dashboard-shell button[class*="bg-emerald-600"]:hover,
+.dashboard-shell button[class*="bg-purple-600"]:hover,
+.dashboard-shell button[class*="bg-cyan-600"]:hover {
+  background-image: linear-gradient(90deg, #1d4ed8, #0891b2, #059669) !important;
+}
+
+
+/* Admin sidebar keeps its dark executive palette even in light mode. */
+.light-theme #admin-sidebar .text-slate-400 { color: #94a3b8 !important; }
+.light-theme #admin-sidebar .text-slate-500 { color: #64748b !important; }
+.light-theme #admin-sidebar .text-slate-300 { color: #cbd5e1 !important; }
+.light-theme #admin-sidebar .text-slate-200 { color: #e2e8f0 !important; }
+
+/* Admin actions use one consistent executive gradient, matching the sidebar. */
+.admin-portal button[class*="bg-indigo-600"],
+.admin-portal button[class*="bg-blue-600"],
+.admin-portal button[class*="bg-cyan-600"],
+.admin-portal button[class*="bg-emerald-600"],
+.admin-portal button[class*="bg-rose-600"] {
+  background-image: linear-gradient(90deg, #e11d48, #7c3aed, #4f46e5) !important;
+  background-color: transparent !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+.admin-portal button[class*="bg-indigo-600"]:hover,
+.admin-portal button[class*="bg-blue-600"]:hover,
+.admin-portal button[class*="bg-cyan-600"]:hover,
+.admin-portal button[class*="bg-emerald-600"]:hover,
+.admin-portal button[class*="bg-rose-600"]:hover {
+  background-image: linear-gradient(90deg, #be123c, #6d28d9, #4338ca) !important;
+}
+
+/* Keep primary admin action buttons visually uniform even when older views use
+   different Tailwind background utilities. Inputs and display badges are untouched. */
+.admin-portal main button:not(:disabled):not([aria-label="Close"]):not([title="Close"]) {
+  background-image: linear-gradient(90deg, #e11d48, #7c3aed, #4f46e5) !important;
+  background-color: transparent !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+.admin-portal main button:not(:disabled):not([aria-label="Close"]):not([title="Close"]):hover {
+  background-image: linear-gradient(90deg, #be123c, #6d28d9, #4338ca) !important;
+}
+
+/* Student dashboard responsive layout */
+html, body, #root {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+@media (max-width: 767px) {
+  #student-header {
+    min-height: 64px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  #student-header .relative > button {
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  #student-sidebar {
+    width: min(86vw, 320px) !important;
+  }
+
+  #student-header .w-80 {
+    width: min(90vw, 320px);
+  }
+}
+
+
+/* Student sidebar layout: desktop is part of the flex layout, so opening it
+   pushes the dashboard content to the right instead of covering it. */
+#student-sidebar {
+  width: 16rem;
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  #student-sidebar.w-0 {
+    width: 0 !important;
+  }
+  #student-sidebar.w-64 {
+    width: 16rem !important;
+  }
+}
+
+@media (max-width: 767px) {
+  #student-sidebar.w-0 {
+    width: min(86vw, 320px) !important;
+    transform: translateX(-100%);
+  }
+  #student-sidebar.w-64 {
+    width: min(86vw, 320px) !important;
+    transform: translateX(0);
+  }
+}
+
+
+/* Subtle landing-page motion; respects accessibility preferences. */
+@keyframes softFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.animate-soft-float { animation: softFloat 4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}
+
+
+/* Landing-page logo motion */
+@keyframes logoPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.16); }
+}
+.animate-logo-pulse { animation: logoPulse 2.4s ease-in-out infinite; transform-origin: center; }
+
+/* Admin dashboard responsive behavior mirrors the student portal. */
+#admin-sidebar { width: 16rem; min-width: 0; }
+@media (min-width: 768px) {
+  #admin-sidebar.w-0 { width: 0 !important; }
+  #admin-sidebar.w-64 { width: 16rem !important; }
+}
+@media (max-width: 767px) {
+  #admin-header { min-height: 64px; padding-left: 12px; padding-right: 12px; }
+  #admin-sidebar.w-0 {
+    width: min(86vw, 320px) !important;
+    transform: translateX(-100%);
+  }
+  #admin-sidebar.w-64 {
+    width: min(86vw, 320px) !important;
+    transform: translateX(0);
+  }
+  #admin-header .relative > div[class*="absolute"] {
+    max-width: calc(100vw - 24px);
+  }
+  .dashboard-shell main {
+    min-width: 0;
+  }
+  .dashboard-shell table {
+    min-width: 680px;
+  }
+}
+
+/* Landing page scroll-reveal system */
+[data-landing-page] .scroll-reveal,
+[data-landing-page] .scroll-reveal-item {
+  opacity: 0;
+  transform: translate3d(0, 34px, 0);
+  transition: opacity 700ms cubic-bezier(.22, 1, .36, 1),
+              transform 700ms cubic-bezier(.22, 1, .36, 1);
+  will-change: opacity, transform;
+}
+
+[data-landing-page] .scroll-reveal.is-visible,
+[data-landing-page] .scroll-reveal-item.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+[data-landing-page] .scroll-reveal-item:nth-child(2) { transition-delay: 90ms; }
+[data-landing-page] .scroll-reveal-item:nth-child(3) { transition-delay: 180ms; }
+[data-landing-page] .scroll-reveal-item:nth-child(4) { transition-delay: 270ms; }
+[data-landing-page] .scroll-reveal-item:nth-child(5) { transition-delay: 360ms; }
+[data-landing-page] .scroll-reveal-item:nth-child(6) { transition-delay: 450ms; }
+
+/* Subtle directional movement for alternating landing-page sections. */
+[data-landing-page] section:nth-of-type(even) .scroll-reveal {
+  transform: translate3d(-30px, 24px, 0);
+}
+[data-landing-page] section:nth-of-type(even) .scroll-reveal.is-visible {
+  transform: translate3d(0, 0, 0);
+}
+
+@media (max-width: 767px) {
+  [data-landing-page] .scroll-reveal,
+  [data-landing-page] .scroll-reveal-item {
+    transform: translate3d(0, 24px, 0);
+    transition-duration: 560ms;
+  }
+  [data-landing-page] section:nth-of-type(even) .scroll-reveal {
+    transform: translate3d(0, 24px, 0);
+  }
+  [data-landing-page] section:nth-of-type(even) .scroll-reveal.is-visible {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-landing-page] .scroll-reveal,
+  [data-landing-page] .scroll-reveal-item,
+  [data-landing-page] section:nth-of-type(even) .scroll-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* Final admin UX polish */
+.admin-portal main button.admin-view-payments:not(:disabled):not([aria-label="Close"]):not([title="Close"]),
+.admin-portal main button.admin-view-payments:not(:disabled):not([aria-label="Close"]):not([title="Close"]):hover {
+  background-image: none !important;
+  background-color: transparent !important;
+  color: #6366f1 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+@media (max-width: 767px) {
+  #admin-header, #student-header {
+    min-height: 62px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  #admin-header > div:first-child,
+  #student-header > div:first-child { min-width: 0; }
+  #admin-header h2 { font-size: 13px; }
+}
