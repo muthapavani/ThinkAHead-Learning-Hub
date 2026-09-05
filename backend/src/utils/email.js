@@ -1,8 +1,10 @@
+const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const User = require('../models/User');
 
+let transporter;
 const brand = process.env.EMAIL_BRAND_NAME || 'ThinkAHead Learning Hub';
 const clientUrl = (process.env.CLIENT_URL || 'http://localhost:3000').split(',')[0].trim();
 const publicApiUrl = (process.env.PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '');
@@ -12,26 +14,55 @@ const randomOtp = () => String(crypto.randomInt(100000, 1000000));
 const randomToken = () => crypto.randomBytes(32).toString('hex');
 const ttlMinutes = Number(process.env.EMAIL_OTP_TTL_MINUTES || 10);
 
-// --- Resend (HTTPS email API) config -----------------------------------------
-// Render's free tier blocks outbound SMTP ports (25/465/587), so plain
-// Nodemailer+SMTP cannot connect from a free web service. Resend sends mail
-// over normal HTTPS (port 443), which is never blocked, so it works on any tier.
 function emailConfig() {
-  const apiKey = String(process.env.RESEND_API_KEY || '').trim();
-  const user = String(process.env.SMTP_USER || '').trim(); // kept for backward compatibility with existing env vars
-  const from = String(process.env.SMTP_FROM || process.env.RESEND_FROM || `${brand} <onboarding@resend.dev>`).trim();
-  return { apiKey, user, from };
+  const host = String(process.env.SMTP_HOST || '').trim();
+  const user = String(process.env.SMTP_USER || '').trim();
+  const pass = String(process.env.SMTP_PASS || '').replace(/\s/g, '');
+  const port = Number(process.env.SMTP_PORT || (host === 'smtp.gmail.com' ? 587 : 587));
+  const secure = String(process.env.SMTP_SECURE || (port === 465 ? 'true' : 'false')).toLowerCase() === 'true';
+  const from = String(process.env.SMTP_FROM || `${brand} <${user}>`).trim();
+  return { host, user, pass, port, secure, from };
 }
 
 function isConfigured() {
   const c = emailConfig();
-  return Boolean(c.apiKey);
+  return Boolean(c.host && c.user && c.pass);
+}
+
+function getTransporter() {
+  const c = emailConfig();
+  if (!c.host || !c.user || !c.pass) {
+    throw new Error('SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS in backend/.env. For Gmail, SMTP_PASS must be a Google App Password (not your normal Gmail password).');
+  }
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: c.host,
+      port: c.port,
+      secure: c.secure,
+      auth: { user: c.user, pass: c.pass },
+      requireTLS: !c.secure && String(process.env.SMTP_REQUIRE_TLS || 'true').toLowerCase() !== 'false',
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 30000,
+      pool: true,
+      maxConnections: 2,
+      maxMessages: 50
+    });
+    transporter.on('error', error => console.error('[email] transporter error:', error.message));
+  }
+  return transporter;
 }
 
 async function verifyEmailTransport() {
-  if (!isConfigured()) return { ok: false, skipped: true, reason: 'RESEND_API_KEY is not configured' };
-  console.log('[email] Resend API key configured, ready to send.');
-  return { ok: true };
+  if (!isConfigured()) return { ok: false, skipped: true, reason: 'SMTP is not configured' };
+  try {
+    await getTransporter().verify();
+    console.log(`[email] SMTP connection verified (${emailConfig().host}:${emailConfig().port}) as ${emailConfig().user}`);
+    return { ok: true };
+  } catch (error) {
+    console.error('[email] SMTP verification failed:', error.message);
+    return { ok: false, error: error.message };
+  }
 }
 
 function layout(title, body) {
@@ -57,45 +88,18 @@ function layout(title, body) {
 async function sendEmail({to, subject, html, text, attachments}) {
   if (!to) throw new Error('Email recipient is missing.');
   const c = emailConfig();
-  if (!c.apiKey) {
-    throw new Error('Resend is not configured. Set RESEND_API_KEY (and optionally SMTP_FROM) in the environment.');
-  }
-
-  // Embed the logo as a Resend attachment (referenced by cid in the HTML <img> tag).
+  // Embed the logo inline with CID so it stays visible inside the email template.
+  // contentDisposition:inline tells compatible mail clients this is part of the HTML content.
   const logoPath = path.join(__dirname, '../../../public/assets/images/logo.png');
   const defaultAttachments = fs.existsSync(logoPath)
-    ? [{ filename: 'thinkahead-logo.png', content: fs.readFileSync(logoPath).toString('base64'), content_id: 'thinkahead-logo' }]
+    ? [{ filename: 'thinkahead-logo.png', path: logoPath, cid: 'thinkahead-logo', contentDisposition: 'inline' }]
     : [];
-  const extraAttachments = (attachments || []).map(a => ({
-    filename: a.filename,
-    content: a.content ? (Buffer.isBuffer(a.content) ? a.content.toString('base64') : a.content)
-      : (a.path && fs.existsSync(a.path) ? fs.readFileSync(a.path).toString('base64') : undefined),
-    content_id: a.cid || undefined
-  })).filter(a => a.content);
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${c.apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: c.from,
-      to: String(to).split(',').map(x => x.trim()).filter(Boolean),
-      subject,
-      html,
-      text,
-      attachments: [...defaultAttachments, ...extraAttachments]
-    })
+  const info = await getTransporter().sendMail({
+    from: c.from, to, subject, html, text,
+    attachments: [...defaultAttachments, ...(attachments || [])]
   });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = data?.message || `Resend API error (status ${response.status})`;
-    throw new Error(message);
-  }
-  console.log(`[email] sent "${subject}" to ${to} (${data.id})`);
-  return { messageId: data.id, accepted: [to], rejected: [] };
+  console.log(`[email] sent "${subject}" to ${to} (${info.messageId})`);
+  return { messageId: info.messageId, accepted: info.accepted, rejected: info.rejected };
 }
 
 async function safeSendEmail(args) {
