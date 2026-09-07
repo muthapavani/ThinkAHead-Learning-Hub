@@ -156,6 +156,24 @@ router.post('/claim-session', async (req,res,next)=>{
   } catch(e){next(e)}
 });
 
+// The frontend calls this with the token from the email. Keeping the browser on
+// the Vercel domain avoids the Safe Browsing interstitial that shared hosting
+// subdomains such as onrender.com sometimes trigger.
+router.post('/verify-email-token', async (req,res,next)=>{
+  try {
+    const raw=String(req.body.token||'').trim();
+    if(!raw) return res.status(400).json({success:false,message:'Verification token is required.'});
+    const user=await User.findOne({emailVerificationTokenHash:hash(raw),emailVerificationExpires:{$gt:new Date()}});
+    if(!user) return res.status(400).json({success:false,message:'This verification link is invalid or has expired. Please request a new one.'});
+    user.emailVerified=true;user.emailVerificationTokenHash=undefined;user.emailVerificationExpires=undefined;user.emailVerificationOtpHash=undefined;user.emailVerificationOtpExpires=undefined;user.otpAttempts=0;await user.save();
+    await Promise.all([
+      sendWelcomeEmail(user).catch(e=>console.error('[auth/verify] welcome email failed:',e.message)),
+      sendAdminNotification('Student email verified', `<p><strong>${user.name}</strong> verified ${user.email}.</p>`, `Student email verified: ${user.name} (${user.email}).`)
+    ]);
+    res.json({success:true,token:signToken(user),user:publicUser(user)});
+  } catch(e){next(e)}
+});
+
 router.get('/verify-email-link', async (req,res,next)=>{
   try {
     if(!req.query.token) return res.status(400).send('Verification token is required.');
