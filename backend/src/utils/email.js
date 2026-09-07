@@ -29,8 +29,15 @@ const ttlMinutes = Number(process.env.EMAIL_OTP_TTL_MINUTES || 10);
 
 function emailConfig() {
   const apiKey = String(process.env.ELASTIC_EMAIL_API_KEY || '').trim();
-  const fromEmail = String(process.env.EMAIL_FROM || '').trim();
-  const fromName = String(process.env.EMAIL_FROM_NAME || brand).trim();
+  const rawFrom = String(process.env.EMAIL_FROM || '').trim();
+  // EMAIL_FROM may be a bare address or already carry a display name, e.g.
+  // 'ThinkAHead Learning Hub <hello@example.com>'. Keep only the address so the
+  // name below is never applied twice, which Elastic Email rejects with a 400.
+  const angled = rawFrom.match(/<\s*([^<>\s]+@[^<>\s]+)\s*>/);
+  const fromEmail = (angled ? angled[1] : rawFrom.replace(/^.*?([^<>\s,]+@[^<>\s,]+).*$/, '$1')).trim();
+  const nameFromEnv = String(process.env.EMAIL_FROM_NAME || '').trim();
+  const nameInFrom = angled ? rawFrom.slice(0, rawFrom.indexOf('<')).trim().replace(/^"|"$/g, '') : '';
+  const fromName = (nameFromEnv || nameInFrom || brand).trim();
   const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
   return { apiKey, fromEmail, fromName, from };
 }
