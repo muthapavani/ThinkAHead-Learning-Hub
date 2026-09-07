@@ -34,6 +34,11 @@ router.post('/register', async (req,res,next) => {
     });
     // Verification is link-only: one email, one click. No OTP is issued here.
     const verificationToken=randomToken();
+    // Secret for this browser only. It lets the tab that registered pick up a
+    // session once the link is opened, even if that happens on another device.
+    const pendingSessionToken=randomToken();
+    user.pendingSessionTokenHash=hash(pendingSessionToken);
+    user.pendingSessionExpires=new Date(Date.now()+Number(process.env.EMAIL_VERIFICATION_TTL_MINUTES||60)*60000);
     user.emailVerificationTokenHash=hash(verificationToken);
     user.emailVerificationExpires=new Date(Date.now()+Number(process.env.EMAIL_VERIFICATION_TTL_MINUTES||60)*60000);
     user.otpAttempts=0;
@@ -45,7 +50,7 @@ router.post('/register', async (req,res,next) => {
     // No session token is issued here on purpose. An account that has not
     // confirmed its email address must not be able to reach the dashboard,
     // and a token in localStorage would survive a page reload.
-    res.status(201).json({success:true,message:'Account created. Open the verification link we just emailed you.',requiresEmailVerification:true,email:user.email});
+    res.status(201).json({success:true,message:'Account created. Open the verification link we just emailed you.',requiresEmailVerification:true,email:user.email,pendingToken:pendingSessionToken});
   } catch(e){next(e)}
 });
 
@@ -171,6 +176,22 @@ router.post('/verify-email-token', async (req,res,next)=>{
       sendAdminNotification('Student email verified', `<p><strong>${user.name}</strong> verified ${user.email}.</p>`, `Student email verified: ${user.name} (${user.email}).`)
     ]);
     res.json({success:true,token:signToken(user),user:publicUser(user)});
+  } catch(e){next(e)}
+});
+
+// Polled by the tab that registered. While the email is unverified it simply
+// reports back; once the link has been opened - on this device or any other -
+// it trades the browser's own secret for a session. The secret never leaves
+// that browser, so nobody who merely knows the address can sign in.
+router.post('/await-verification', async (req,res,next)=>{
+  try {
+    const pendingToken=String(req.body.pendingToken||'').trim();
+    if(!pendingToken) return res.json({success:true,verified:false});
+    const user=await User.findOne({pendingSessionTokenHash:hash(pendingToken),pendingSessionExpires:{$gt:new Date()}});
+    if(!user) return res.json({success:true,verified:false});
+    if(!user.emailVerified) return res.json({success:true,verified:false});
+    user.pendingSessionTokenHash=undefined;user.pendingSessionExpires=undefined;await user.save();
+    res.json({success:true,verified:true,token:signToken(user),user:publicUser(user)});
   } catch(e){next(e)}
 });
 
