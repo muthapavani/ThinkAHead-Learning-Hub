@@ -18,14 +18,14 @@ const ChatThread=require('../models/ChatThread');
 const Notification=require('../models/Notification');
 const Achievement=require('../models/Achievement');
 const Payment=require('../models/Payment');
-const {requireAuth}=require('../middleware/auth');
+const {requireAuth,requireVerifiedEmail}=require('../middleware/auth');
 const { sendCourseCompletionEmail, sendAdminNotification, sendCourseStartedEmail, sendSubscriptionSuccessEmail, sendSubscriptionFailedEmail, sendCertificateAvailableEmail } = require('../utils/email');
 
 const router=express.Router();
 const uploadDir=path.join(__dirname,'../../uploads');
 fs.mkdirSync(uploadDir,{recursive:true});
 const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:2*1024*1024},fileFilter:(req,file,cb)=>cb(null,/^image\/(jpeg|png|webp|gif)$/.test(file.mimetype))});
-router.use(requireAuth);
+router.use(requireAuth,requireVerifiedEmail);
 
 const avatarFor=u=>u.profilePhoto?.length ? `data:${u.profilePhotoMimeType||'image/jpeg'};base64,${Buffer.from(u.profilePhoto).toString('base64')}` : '';
 const toUser=u=>({id:u._id.toString(),name:u.name,email:u.email,phone:u.phone||'',role:u.role,avatar:avatarFor(u),bio:u.bio||'',enrolledCourseIds:u.enrolledCourseIds||[],completedCourseIds:u.completedCourseIds||[],subscription:u.subscription,streakDays:u.streakDays||0,totalHours:u.totalHours||0,points:u.points||0,unlockedBadgeIds:u.unlockedBadgeIds||[],emailVerified:!!u.emailVerified,emailNotifications:u.emailNotifications!==false});

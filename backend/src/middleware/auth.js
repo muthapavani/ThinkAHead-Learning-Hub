@@ -29,4 +29,19 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { signToken, requireAuth, requireRole };
+// Blocks any account whose email address has not been confirmed yet. Google
+// accounts are verified by Google itself, so they always pass. Must run after
+// requireAuth, which is what puts req.user in place.
+function requireVerifiedEmail(req, res, next) {
+  if (req.user && req.user.emailVerified !== true) {
+    return res.status(403).json({
+      success: false,
+      code: 'EMAIL_NOT_VERIFIED',
+      email: req.user.email,
+      message: 'Please verify your email address before continuing.'
+    });
+  }
+  next();
+}
+
+module.exports = { signToken, requireAuth, requireRole, requireVerifiedEmail };

@@ -36,6 +36,10 @@ const userSchema = new mongoose.Schema({
   resetPasswordTokenHash: String,
   resetPasswordExpires: Date,
   emailVerificationTokenHash: String,
+  // One-time token handed out after the email link is opened, so that tab can
+  // start a real session instead of sending the person back to the login form.
+  sessionClaimTokenHash: String,
+  sessionClaimExpires: Date,
   emailVerificationExpires: Date,
   emailVerificationOtpHash: String,
   emailVerificationOtpExpires: Date,

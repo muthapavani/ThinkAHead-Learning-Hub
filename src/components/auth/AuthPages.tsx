@@ -18,6 +18,163 @@ import { useApp } from '../../context/AppContext';
 import { Logo } from '../common/Logo';
 import { ThemeToggle } from '../common/ThemeToggle';
 
+// ---------------------------------------------------------------------------
+// Google Sign-In
+//
+// We deliberately do NOT use google.accounts.id.prompt() (One Tap). Google
+// silently suppresses One Tap after a user dismisses it once, when third-party
+// cookies are blocked, and in private windows - the button then appears to do
+// nothing at all. google.accounts.id.renderButton() has none of those limits,
+// so we render Google's real button and lay it invisibly over our styled one.
+// ---------------------------------------------------------------------------
+
+const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
+const GOOGLE_CLIENT_ID_VALID = /^[0-9A-Za-z_-]+\.apps\.googleusercontent\.com$/.test(GOOGLE_CLIENT_ID);
+const GSI_SRC = 'https://accounts.google.com/gsi/client';
+
+let gsiPromise: Promise<void> | null = null;
+
+const loadGoogleScript = (): Promise<void> => {
+  if (gsiPromise) return gsiPromise;
+  gsiPromise = new Promise<void>((resolve, reject) => {
+    if ((window as any).google?.accounts?.id) { resolve(); return; }
+    const id = 'google-gsi-script';
+    let script = document.getElementById(id) as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement('script');
+      script.id = id;
+      script.src = GSI_SRC;
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+    script.addEventListener('load', () => resolve(), { once: true });
+    script.addEventListener(
+      'error',
+      () => {
+        gsiPromise = null; // allow a retry on the next mount
+        reject(new Error('Google Identity Services could not be loaded. Check your internet connection or ad blocker.'));
+      },
+      { once: true }
+    );
+    if ((window as any).google?.accounts?.id) resolve();
+  });
+  return gsiPromise;
+};
+
+interface GoogleAuthButtonProps {
+  theme: string;
+  label?: string;
+  onCredential: (credential: string) => void;
+  onError: (message: string) => void;
+}
+
+const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ theme, label = 'Continue with Google', onCredential, onError }) => {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Keep the latest callbacks without re-running the effect on every render.
+  const callbacksRef = useRef({ onCredential, onError });
+  callbacksRef.current = { onCredential, onError };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!GOOGLE_CLIENT_ID) {
+      setStatus('error');
+      setErrorMessage('Google Sign-In is not configured. Add VITE_GOOGLE_CLIENT_ID to your .env (and to Vercel), then rebuild.');
+      return;
+    }
+    if (!GOOGLE_CLIENT_ID_VALID) {
+      setStatus('error');
+      setErrorMessage('VITE_GOOGLE_CLIENT_ID is invalid. It must be the Web OAuth Client ID ending in .apps.googleusercontent.com');
+      return;
+    }
+
+    loadGoogleScript()
+      .then(() => {
+        if (cancelled || !hostRef.current) return;
+        const google = (window as any).google;
+        if (!google?.accounts?.id) throw new Error('Google Identity Services is unavailable.');
+
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response: any) => {
+            if (!response?.credential) {
+              callbacksRef.current.onError('Google did not return a sign-in credential. Please try again.');
+              return;
+            }
+            callbacksRef.current.onCredential(response.credential);
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          ux_mode: 'popup'
+        });
+
+        const measured = Math.round(wrapRef.current?.getBoundingClientRect().width || 320);
+        hostRef.current.innerHTML = '';
+        google.accounts.id.renderButton(hostRef.current, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          text: 'continue_with',
+          shape: 'rectangular',
+          logo_alignment: 'left',
+          width: Math.min(Math.max(measured, 200), 400) // Google caps the width at 400px
+        });
+        setStatus('ready');
+      })
+      .catch((e: any) => {
+        if (cancelled) return;
+        setStatus('error');
+        setErrorMessage(e?.message || 'Google Sign-In could not be loaded.');
+        console.error('[GoogleAuthButton]', e);
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div ref={wrapRef} className="relative w-full">
+      <style>{`
+        .tah-gsi-overlay > div,
+        .tah-gsi-overlay iframe { width: 100% !important; height: 100% !important; }
+      `}</style>
+
+      {/* Visible, themed button. Purely presentational when Google is ready. */}
+      <button
+        type="button"
+        disabled={status === 'loading'}
+        onClick={() => { if (status === 'error') onError(errorMessage); }}
+        className={`w-full py-2.5 rounded-xl text-xs font-semibold border flex items-center justify-center gap-2.5 transition-all ${
+          theme === 'dark'
+            ? 'border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200'
+            : 'border-slate-300 bg-white hover:bg-slate-50 text-slate-700 shadow-sm'
+        } ${status === 'loading' ? 'opacity-60 cursor-wait' : ''}`}
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+        </svg>
+        <span>{status === 'ready' ? label : status === 'loading' ? 'Loading Google…' : 'Google Sign-In unavailable'}</span>
+      </button>
+
+      {/* Google's real button, transparent and stretched over the one above.
+          This node must never be unmounted, otherwise the button Google
+          rendered into it would be thrown away. */}
+      <div
+        ref={hostRef}
+        className={`tah-gsi-overlay absolute inset-0 overflow-hidden opacity-0 ${status === 'ready' ? '' : 'pointer-events-none'}`}
+        style={{ colorScheme: 'light' }}
+      />
+    </div>
+  );
+};
+
 export const AuthPages: React.FC = () => {
   const {
     currentView,
@@ -29,7 +186,6 @@ export const AuthPages: React.FC = () => {
     verifyPasswordResetOtp,
     resendPasswordResetOtp,
     resetPassword,
-    verifyEmailOtp,
     resendVerificationEmail,
     showToast,
     signInWithGoogle
@@ -49,8 +205,35 @@ export const AuthPages: React.FC = () => {
   const [resending, setResending] = useState(false);
   const [otp, setOtp] = useState('');
   const [verificationPurpose, setVerificationPurpose] = useState<'registration'|'password-reset'>('registration');
-  const [googleReady, setGoogleReady] = useState(false);
-  const googleReadyRef = useRef<Promise<void> | null>(null);
+
+  // While the verification screen is open, watch for the person opening the
+  // link in their email. The link is handled by the backend in another tab, so
+  // polling is what lets this tab move on without a manual reload.
+  useEffect(() => {
+    if (currentView !== 'auth-verify' || verificationPurpose === 'password-reset') return;
+    const pending = (email || localStorage.getItem('tah_verify_email') || '').trim();
+    if (!pending) return;
+
+    let stopped = false;
+    const check = async () => {
+      try {
+        const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+        const res = await fetch(`${base}/auth/verification-status?email=${encodeURIComponent(pending)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (stopped || !data?.verified) return;
+        stopped = true;
+        localStorage.removeItem('tah_verify_email');
+        localStorage.removeItem('tah_verify_purpose');
+        showToast('Email verified successfully. Please sign in to continue.');
+        setCurrentView('auth-login');
+      } catch { /* offline or backend asleep - just try again next tick */ }
+    };
+
+    const timer = setInterval(check, 4000);
+    void check();
+    return () => { stopped = true; clearInterval(timer); };
+  }, [currentView, verificationPurpose, email]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -68,29 +251,8 @@ export const AuthPages: React.FC = () => {
     else if (purpose === 'registration') setVerificationPurpose('registration');
   }, [setCurrentView]);
 
-  useEffect(() => {
-    const existing = (window as any).google?.accounts?.id;
-    if (existing) { setGoogleReady(true); return; }
-    const id = 'google-gsi-script';
-    const script = document.getElementById(id) as HTMLScriptElement | null;
-    googleReadyRef.current = new Promise<void>((resolve, reject) => {
-      if (script) {
-        if ((window as any).google?.accounts?.id) { setGoogleReady(true); resolve(); return; }
-        script.addEventListener('load', () => { setGoogleReady(true); resolve(); }, { once: true });
-        script.addEventListener('error', () => reject(new Error('Google Identity Services could not be loaded.')), { once: true });
-        return;
-      }
-      const s = document.createElement('script');
-      s.id = id;
-      s.src = 'https://accounts.google.com/gsi/client';
-      s.async = true;
-      s.defer = true;
-      s.onload = () => { setGoogleReady(true); resolve(); };
-      s.onerror = () => reject(new Error('Google Identity Services could not be loaded.'));
-      document.head.appendChild(s);
-    });
-    return () => { googleReadyRef.current = null; };
-  }, []);
+  // Warm up the Google script early so the button is ready by the time it renders.
+  useEffect(() => { void loadGoogleScript().catch(() => { /* surfaced by GoogleAuthButton */ }); }, []);
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,32 +273,6 @@ export const AuthPages: React.FC = () => {
     void login(email, password);
   };
 
-  const handleGoogleAuth = async () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
-    if (!clientId) { showToast('Google Sign-In is not configured. Add VITE_GOOGLE_CLIENT_ID to the frontend .env and restart Vite.'); return; }
-    if (!/^[0-9A-Za-z_-]+\.apps\.googleusercontent\.com$/.test(clientId)) { showToast('VITE_GOOGLE_CLIENT_ID is invalid. Use your Google Web OAuth Client ID ending in .apps.googleusercontent.com.'); return; }
-    try {
-      if (googleReadyRef.current) await googleReadyRef.current;
-      const google = (window as any).google;
-      if (!google?.accounts?.id) throw new Error('Google Identity Services is unavailable.');
-      google.accounts.id.initialize({
-        client_id: clientId,
-        callback: (response: any) => {
-          if (!response?.credential) { showToast('Google did not return a sign-in credential.'); return; }
-          void signInWithGoogle(response.credential);
-        },
-        auto_select: false,
-        cancel_on_tap_outside: true,
-        use_fedcm_for_prompt: true
-      });
-      google.accounts.id.prompt((notification: any) => {
-        if (notification?.isNotDisplayed?.()) console.warn('Google prompt not displayed:', notification.getNotDisplayedReason?.());
-        if (notification?.isSkippedMoment?.()) console.warn('Google prompt skipped:', notification.getSkippedReason?.());
-      });
-    } catch (e: any) {
-      showToast(e.message || 'Google sign-in could not start.');
-    }
-  };
 
   const handleSendReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,12 +288,9 @@ export const AuthPages: React.FC = () => {
     e.preventDefault();
     const targetEmail = email.trim() || localStorage.getItem('tah_verify_email') || localStorage.getItem('tah_reset_email') || '';
     if (!targetEmail || !/^\d{6}$/.test(otp.trim())) { showToast('Enter the 6-digit OTP sent to your email.'); return; }
-    if (verificationPurpose === 'password-reset') {
-      const token = await verifyPasswordResetOtp(targetEmail, otp.trim());
-      if (token) setCurrentView('auth-reset');
-    } else {
-      await verifyEmailOtp(targetEmail, otp.trim());
-    }
+    // Only the password-reset flow uses an OTP. Email verification is link-only.
+    const token = await verifyPasswordResetOtp(targetEmail, otp.trim());
+    if (token) setCurrentView('auth-reset');
   };
 
   const handleResendEmail = async () => {
@@ -398,23 +531,11 @@ export const AuthPages: React.FC = () => {
                   <span className="relative px-3 text-[11px] uppercase font-bold text-slate-400 bg-white dark:bg-[#0f172a]">OR</span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleGoogleAuth}
-                  className={`w-full py-2.5 rounded-xl text-xs font-semibold border flex items-center justify-center gap-2.5 transition-all ${
-                    theme === 'dark'
-                      ? 'border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200'
-                      : 'border-slate-300 bg-white hover:bg-slate-50 text-slate-700 shadow-sm'
-                  }`}
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                  </svg>
-                  <span>{googleReady ? 'Continue with Google' : 'Loading Google…'}</span>
-                </button>
+                <GoogleAuthButton
+                  theme={theme}
+                  onCredential={(credential) => { void signInWithGoogle(credential); }}
+                  onError={(message) => showToast(message)}
+                />
 
                 <div className="text-center text-xs text-slate-400 pt-3">
                   Already have an account?{' '}
@@ -568,23 +689,11 @@ export const AuthPages: React.FC = () => {
                   <span className="relative px-3 text-[11px] uppercase font-bold text-slate-400 bg-white dark:bg-[#0f172a]">OR</span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleGoogleAuth}
-                  className={`w-full py-2.5 rounded-xl text-xs font-semibold border flex items-center justify-center gap-2.5 transition-all ${
-                    theme === 'dark'
-                      ? 'border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200'
-                      : 'border-slate-300 bg-white hover:bg-slate-50 text-slate-700 shadow-sm'
-                  }`}
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                  </svg>
-                  <span>{googleReady ? 'Continue with Google' : 'Loading Google…'}</span>
-                </button>
+                <GoogleAuthButton
+                  theme={theme}
+                  onCredential={(credential) => { void signInWithGoogle(credential); }}
+                  onError={(message) => showToast(message)}
+                />
 
                 <div className="text-center text-xs text-slate-400 pt-3">
                   Don't have an account?{' '}
@@ -674,17 +783,29 @@ export const AuthPages: React.FC = () => {
                 <div className="w-full h-full bg-slate-900/90 rounded-[22px] flex items-center justify-center"><CheckCircle2 className="w-10 h-10 text-emerald-400" /></div>
               </div>
             </div>
-            <h3 className="text-2xl font-black tracking-tight">{verificationPurpose === 'password-reset' ? 'Verify Reset OTP' : 'Verify Your Email'}</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">{verificationPurpose === 'password-reset' ? 'Enter the 6-digit OTP sent to your registered email to continue.' : 'We sent a verification link and a 6-digit OTP to your email address.'}</p>
+            <h3 className="text-2xl font-black tracking-tight">{verificationPurpose === 'password-reset' ? 'Verify Reset OTP' : 'Check Your Email'}</h3>
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">{verificationPurpose === 'password-reset' ? 'Enter the 6-digit OTP sent to your registered email to continue.' : 'We sent you a verification link. Open the email and tap the Verify Email button — this page will continue on its own.'}</p>
             <div className="my-4 px-4 py-2 rounded-xl bg-slate-100 border border-slate-200 dark:bg-slate-800/60 dark:border-slate-700 text-xs font-mono text-cyan-600 dark:text-cyan-300 inline-block max-w-full truncate">{email || 'your@email.com'}</div>
-            <form onSubmit={handleVerifyOtp} className="mt-4 space-y-3 text-left">
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">6-Digit OTP</label>
-                <input value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" maxLength={6} placeholder="000000" className={`w-full text-center tracking-[0.5em] font-black text-xl py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-cyan-500 ${theme==='dark'?'bg-slate-800 border-slate-700 text-white':'bg-slate-50 border-slate-200 text-slate-900'}`} />
+
+            {verificationPurpose !== 'password-reset' && (
+              <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 mb-2">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                <span>Waiting for you to open the link…</span>
               </div>
-              <button type="submit" className="w-full py-3 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 shadow-lg transition-all">Verify OTP</button>
-            </form>
-            <div className="mt-4 p-3 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-slate-800/40 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400">OTP expires in 10 minutes. Maximum 5 attempts per code.</div>
+            )}
+
+            {verificationPurpose === 'password-reset' && (
+              <>
+                <form onSubmit={handleVerifyOtp} className="mt-4 space-y-3 text-left">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">6-Digit Code</label>
+                    <input value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" maxLength={6} placeholder="000000" className={`w-full text-center tracking-[0.5em] font-black text-xl py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-cyan-500 ${theme==='dark'?'bg-slate-800 border-slate-700 text-white':'bg-slate-50 border-slate-200 text-slate-900'}`} />
+                  </div>
+                  <button type="submit" className="w-full py-3 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 shadow-lg transition-all">Verify Code</button>
+                </form>
+                <div className="mt-4 p-3 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-slate-800/40 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400">The code expires in 10 minutes. Maximum 5 attempts per code.</div>
+              </>
+            )}
             <div className="text-xs text-slate-400 pt-4 flex items-center justify-center gap-1">
               <span>Didn't receive it?</span>
               <button type="button" onClick={handleResendEmail} disabled={resending} className="text-blue-500 font-bold hover:underline ml-1 inline-flex items-center gap-1">{resending && <RefreshCw className="w-3 h-3 animate-spin" />}<span>Resend</span></button>

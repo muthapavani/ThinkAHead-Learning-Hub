@@ -10,6 +10,10 @@ app.use(express.json({limit:'2mb'}));app.use(express.urlencoded({extended:true})
 const path=require('path');
 app.use('/uploads',express.static(path.join(__dirname,'../uploads')));
 // Public branding assets used by HTML emails. Served by URL, not attached to emails.
+// /brand lives inside the backend folder, so it keeps working when only the
+// backend is deployed. The /assets/images mount below is a convenience for
+// running the whole repo locally and may not exist on a backend-only deploy.
+app.use('/brand',express.static(path.join(__dirname,'assets'),{maxAge:'7d'}));
 app.use('/assets/images',express.static(path.join(__dirname,'../../public/assets/images')));
 app.use('/api',rateLimit({windowMs:15*60*1000,max:300,standardHeaders:true,legacyHeaders:false}));
 app.get('/api/health',async(req,res)=>res.json({success:true,status:'ok',service:'thinkahead-api',timestamp:new Date().toISOString()}));

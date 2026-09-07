@@ -32,20 +32,20 @@ router.post('/register', async (req,res,next) => {
       enrolledCourseIds:['course-1','course-2'], completedCourseIds:[], subscription:{active:false,plan:'Free Trial',startDate:new Date().toISOString().slice(0,10),expiresDate:'',unlockedMonths:1,amount:0},
       streakDays:0,totalHours:0,points:0,unlockedBadgeIds:['badge-1']
     });
+    // Verification is link-only: one email, one click. No OTP is issued here.
     const verificationToken=randomToken();
-    const verificationOtp=randomOtp();
     user.emailVerificationTokenHash=hash(verificationToken);
     user.emailVerificationExpires=new Date(Date.now()+Number(process.env.EMAIL_VERIFICATION_TTL_MINUTES||60)*60000);
-    user.emailVerificationOtpHash=hash(verificationOtp);
-    user.emailVerificationOtpExpires=new Date(Date.now()+ttlMinutes*60000);
     user.otpAttempts=0;
     await user.save();
     await Promise.all([
       sendVerificationEmail(user,verificationToken).catch(e => console.error('[auth/register] verification email failed:', e.message)),
-      sendOtpEmail(user,verificationOtp,'verification').catch(e => console.error('[auth/register] verification OTP email failed:', e.message)),
       sendAdminNotification('New student registration', `<p><strong>${user.name}</strong> registered with ${user.email}.</p><p>Registration time: ${new Date().toLocaleString('en-IN',{timeZone:process.env.EMAIL_TIMEZONE||'Asia/Kolkata'})}</p>`, `New student registration: ${user.name} (${user.email}).`)
     ]);
-    res.status(201).json({success:true,message:'Account created. Check your email for the verification link or OTP.',requiresEmailVerification:true,token:signToken(user),user:publicUser(user)});
+    // No session token is issued here on purpose. An account that has not
+    // confirmed its email address must not be able to reach the dashboard,
+    // and a token in localStorage would survive a page reload.
+    res.status(201).json({success:true,message:'Account created. Open the verification link we just emailed you.',requiresEmailVerification:true,email:user.email});
   } catch(e){next(e)}
 });
 
@@ -55,8 +55,12 @@ router.post('/login', async (req,res,next)=>{
     const email=req.body.email.trim().toLowerCase();
     const user=await User.findOne({email}).select('+passwordHash');
     if(!user || !user.passwordHash || !(await bcrypt.compare(req.body.password,user.passwordHash))) return res.status(401).json({success:false,message:'Invalid email or password.'});
-    const loginResult={success:true,token:signToken(user),user:publicUser(user),requiresEmailVerification:!user.emailVerified};
-    res.json(loginResult);
+    if(!user.emailVerified){
+      // Correct password, but the email is still unconfirmed: send them to the
+      // verification screen without a token so no session can be restored.
+      return res.json({success:true,requiresEmailVerification:true,email:user.email,message:'Please verify your email address to continue.'});
+    }
+    res.json({success:true,token:signToken(user),user:publicUser(user),requiresEmailVerification:false});
   } catch(e){next(e)}
 });
 
@@ -121,12 +125,34 @@ router.post('/reset-password', async (req,res,next)=>{
   } catch(e){next(e)}
 });
 
-router.post('/verify-email', requireAuth, async (req,res,next)=>{
+// The old POST /verify-email endpoint was removed. It flipped emailVerified to
+// true for any authenticated caller without checking a token or an OTP, so a
+// single request could bypass verification entirely. Verification now happens
+// only through /verify-email-link, the link sent in the email.
+
+// Lets the verification screen notice that the person already used the link in
+// their email, so it can stop asking for an OTP. Never reveals whether an
+// address is registered: unknown addresses simply come back as not verified.
+router.get('/verification-status', async (req,res,next)=>{
   try {
-    if(req.user.emailVerified) return res.json({success:true,user:publicUser(req.user),alreadyVerified:true});
-    const user=await User.findById(req.user._id);
-    if(!user.emailVerified){user.emailVerified=true;user.emailVerificationTokenHash=undefined;user.emailVerificationExpires=undefined;user.emailVerificationOtpHash=undefined;user.emailVerificationOtpExpires=undefined;user.otpAttempts=0;await user.save();void sendWelcomeEmail(user);void sendAdminNotification('Student email verified', `<p><strong>${user.name}</strong> verified ${user.email}.</p>`, `Student email verified: ${user.name} (${user.email}).`);}
-    res.json({success:true,user:publicUser(user)});
+    const email=String(req.query.email||'').trim().toLowerCase();
+    if(!email) return res.json({success:true,verified:false});
+    const user=await User.findOne({email}).select('emailVerified').lean();
+    res.json({success:true,verified:Boolean(user?.emailVerified)});
+  } catch(e){next(e)}
+});
+
+// Exchanges the one-time token from the verification link for a session. The
+// token is single use, expires in 10 minutes, and only ever reaches the person
+// who opened the link in their own inbox.
+router.post('/claim-session', async (req,res,next)=>{
+  try {
+    const token=String(req.body.token||'').trim();
+    if(!token) return res.status(400).json({success:false,message:'Missing token.'});
+    const user=await User.findOne({sessionClaimTokenHash:hash(token),sessionClaimExpires:{$gt:new Date()}});
+    if(!user) return res.status(400).json({success:false,message:'This link has already been used or has expired. Please sign in.'});
+    user.sessionClaimTokenHash=undefined;user.sessionClaimExpires=undefined;await user.save();
+    res.json({success:true,token:signToken(user),user:publicUser(user)});
   } catch(e){next(e)}
 });
 
@@ -138,29 +164,26 @@ router.get('/verify-email-link', async (req,res,next)=>{
     if(!user) return res.status(400).send('This verification link is invalid or expired. Please request a new verification email.');
     user.emailVerified=true;user.emailVerificationTokenHash=undefined;user.emailVerificationExpires=undefined;user.emailVerificationOtpHash=undefined;user.emailVerificationOtpExpires=undefined;user.otpAttempts=0;await user.save();
     await Promise.all([sendWelcomeEmail(user),sendAdminNotification('Student email verified', `<p><strong>${user.name}</strong> verified ${user.email}.</p>`, `Student email verified: ${user.name} (${user.email}).`)]);
-    res.send(`<html><body style="font-family:Arial;text-align:center;padding:60px"><h2>Email verified successfully</h2><p>You can return to ThinkAHead Learning Hub and continue.</p><a href="${process.env.CLIENT_URL||'http://localhost:3000'}" style="display:inline-block;padding:12px 18px;background:#2563eb;color:white;text-decoration:none;border-radius:8px">Open Learning Hub</a></body></html>`);
+    // Hand this tab a one-time claim token so it can open the dashboard already
+    // signed in, instead of bouncing the person back to the login form.
+    const claim=randomToken();
+    user.sessionClaimTokenHash=hash(claim);
+    user.sessionClaimExpires=new Date(Date.now()+10*60000);
+    await user.save();
+    const target=`${(process.env.CLIENT_URL||'http://localhost:3000').split(',')[0].trim().replace(/\/$/,'')}/?verified=1&claim=${encodeURIComponent(claim)}`;
+    res.redirect(302, target);
   } catch(e){next(e)}
 });
 
-router.post('/verify-email-otp', async (req,res,next)=>{
-  try {
-    requireFields(req.body,['email','otp']);validateEmail(req.body.email);
-    const user=await User.findOne({email:req.body.email.trim().toLowerCase()});
-    if(!user || user.emailVerified || !user.emailVerificationOtpHash || !user.emailVerificationOtpExpires || user.emailVerificationOtpExpires<=new Date()) return res.status(400).json({success:false,message:'OTP is invalid or expired.'});
-    if((user.otpAttempts||0)>=5)return res.status(429).json({success:false,message:'Too many OTP attempts. Please request a new code.'});
-    if(hash(String(req.body.otp).trim())!==user.emailVerificationOtpHash){user.otpAttempts=(user.otpAttempts||0)+1;await user.save();return res.status(400).json({success:false,message:'OTP is invalid or expired.'});}
-    user.emailVerified=true;user.emailVerificationTokenHash=undefined;user.emailVerificationExpires=undefined;user.emailVerificationOtpHash=undefined;user.emailVerificationOtpExpires=undefined;user.otpAttempts=0;await user.save();
-    await Promise.all([sendWelcomeEmail(user),sendAdminNotification('Student email verified', `<p><strong>${user.name}</strong> verified ${user.email}.</p>`, `Student email verified: ${user.name} (${user.email}).`)]);
-    res.json({success:true,message:'Email verified successfully.',user:publicUser(user)});
-  } catch(e){next(e)}
-});
+// Email verification is link-only, so there is no OTP endpoint here. The
+// password-reset flow keeps its own OTP routes below.
 
 router.post('/resend-verification', async (req,res,next)=>{
   try {
     requireFields(req.body,['email']);validateEmail(req.body.email);
     const user=await User.findOne({email:req.body.email.trim().toLowerCase()});
-    if(user && !user.emailVerified){const token=randomToken();const otp=randomOtp();user.emailVerificationTokenHash=hash(token);user.emailVerificationExpires=new Date(Date.now()+Number(process.env.EMAIL_VERIFICATION_TTL_MINUTES||60)*60000);user.emailVerificationOtpHash=hash(otp);user.emailVerificationOtpExpires=new Date(Date.now()+ttlMinutes*60000);user.otpAttempts=0;await user.save();await Promise.all([sendVerificationEmail(user,token),sendOtpEmail(user,otp,'verification')]);}
-    res.json({success:true,message:'If the account exists, a new verification email and OTP have been sent.'});
+    if(user && !user.emailVerified){const token=randomToken();user.emailVerificationTokenHash=hash(token);user.emailVerificationExpires=new Date(Date.now()+Number(process.env.EMAIL_VERIFICATION_TTL_MINUTES||60)*60000);user.otpAttempts=0;await user.save();await sendVerificationEmail(user,token);}
+    res.json({success:true,message:'If the account exists, a new verification email has been sent.'});
   } catch(e){next(e)}
 });
 

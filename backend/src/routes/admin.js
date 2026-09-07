@@ -6,8 +6,8 @@ const Certificate=require('../models/Certificate');
 const Payment=require('../models/Payment');
 const Notification=require('../models/Notification');
 const Achievement=require('../models/Achievement');
-const {requireAuth,requireRole}=require('../middleware/auth');
-const router=express.Router();router.use(requireAuth,requireRole('admin'));
+const {requireAuth,requireRole,requireVerifiedEmail}=require('../middleware/auth');
+const router=express.Router();router.use(requireAuth,requireVerifiedEmail,requireRole('admin'));
 
 const userDto=u=>({id:u._id.toString(),name:u.name,email:u.email,phone:u.phone||'',role:u.role,avatar:u.profilePhoto?.length ? `data:${u.profilePhotoMimeType||'image/jpeg'};base64,${Buffer.from(u.profilePhoto).toString('base64')}` : '',bio:u.bio||'',enrolledCourseIds:u.enrolledCourseIds||[],completedCourseIds:u.completedCourseIds||[],subscription:u.subscription,streakDays:u.streakDays||0,totalHours:u.totalHours||0,points:u.points||0,unlockedBadgeIds:u.unlockedBadgeIds||[]});
 

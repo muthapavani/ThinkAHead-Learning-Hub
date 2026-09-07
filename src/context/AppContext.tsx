@@ -32,8 +32,6 @@ interface AppContextType {
   verifyPasswordResetOtp: (email: string, otp: string) => Promise<string | undefined>;
   resendPasswordResetOtp: (email: string) => Promise<void>;
   resetPassword: (newPassword: string, token?: string) => Promise<void>;
-  verifyEmail: () => Promise<void>;
-  verifyEmailOtp: (email: string, otp: string) => Promise<void>;
   resendVerificationEmail: (email: string) => Promise<void>;
 
   courses: Course[]; selectedCourseId: string; setSelectedCourseId: (id: string) => void; activeCourse: Course;
@@ -132,7 +130,34 @@ export const AppProvider: React.FC<{children:React.ReactNode}> = ({children}) =>
       const params=new URLSearchParams(window.location.search);
       const resetToken=params.get('resetToken');
       const resetEmail=params.get('email');
+      const claim=params.get('claim');
       if(resetToken){localStorage.setItem('tah_reset_token',resetToken);if(resetEmail)localStorage.setItem('tah_reset_email',resetEmail);setCurrentView('auth-reset');}
+
+      // Arriving back from the "Verify My Email" link: trade the one-time token
+      // for a session so this tab lands on the dashboard, already signed in.
+      if(claim){
+        window.history.replaceState({},'',window.location.pathname);
+        try {
+          const r=await api<any>('/auth/claim-session',{method:'POST',body:JSON.stringify({token:claim})});
+          if(cancelled)return;
+          setToken(r.token);
+          setCurrentUser(r.user);
+          localStorage.removeItem('tah_verify_email');
+          localStorage.removeItem('tah_verify_purpose');
+          localStorage.removeItem('tah_verify_started');
+          setCurrentView(r.user.role==='admin'?'admin-dashboard':'student-dashboard');
+          showToast('Email verified. Welcome to ThinkAHead Learning Hub!');
+          if(r.user.role==='student'){try{const boot=await api<any>('/student/bootstrap');if(!cancelled)applyBootstrap(boot.data)}catch{}}
+          return;
+        } catch(e:any){
+          if(cancelled)return;
+          localStorage.removeItem('tah_verify_email');
+          localStorage.removeItem('tah_verify_purpose');
+          setCurrentView('auth-login');
+          showToast(e.message||'This verification link has already been used. Please sign in.');
+          return;
+        }
+      }
       try {
         const pub=await api<any>('/public/bootstrap'); if(cancelled)return;
         if(pub.data?.courses?.length)setCourses(pub.data.courses);
@@ -143,6 +168,17 @@ export const AppProvider: React.FC<{children:React.ReactNode}> = ({children}) =>
         try {
           const auth=await api<any>('/auth/me');
           if(cancelled)return;
+          // A reload must never skip email verification. Older sessions created
+          // before verification was enforced can still hold a token here.
+          if(auth.user.emailVerified!==true){
+            clearToken();
+            setCurrentUser(null);
+            localStorage.setItem('tah_verify_email',auth.user.email);
+            localStorage.setItem('tah_verify_purpose','registration');
+            localStorage.setItem('tah_verify_started',String(Date.now()));
+            setCurrentView('auth-verify');
+            return;
+          }
           setCurrentUser(auth.user);
           setCurrentView(auth.user.role==='admin'?'admin-dashboard':'student-dashboard');
           // Student bootstrap is protected for student accounts. Never call it
@@ -157,6 +193,32 @@ export const AppProvider: React.FC<{children:React.ReactNode}> = ({children}) =>
             if(!cancelled){setPayments(p.payments);setCertificates(c.certificates.map(toCertificate))}
           }
         } catch { clearToken(); setCurrentUser(null); setCurrentView('landing'); }
+      } else if(!resetToken){
+        // A pending verification should only take over the page right after
+        // signing up. Anything older is stale, so the landing page wins.
+        const pendingEmail=localStorage.getItem('tah_verify_email');
+        const startedAt=Number(localStorage.getItem('tah_verify_started')||0);
+        const isRecent=startedAt>0 && Date.now()-startedAt < 60*60*1000;
+        if(pendingEmail && !isRecent){
+          localStorage.removeItem('tah_verify_email');
+          localStorage.removeItem('tah_verify_purpose');
+          localStorage.removeItem('tah_verify_started');
+        } else if(pendingEmail){
+          try {
+            const st=await api<any>(`/auth/verification-status?email=${encodeURIComponent(pendingEmail)}`);
+            if(cancelled)return;
+            if(st.verified){
+              // They used the link in the email, so nothing is pending anymore.
+              localStorage.removeItem('tah_verify_email');
+              localStorage.removeItem('tah_verify_purpose');
+              localStorage.removeItem('tah_verify_started');
+              setCurrentView('auth-login');
+              showToast('Your email is already verified. Please sign in.');
+              return;
+            }
+          } catch {}
+          if(!cancelled)setCurrentView('auth-verify');
+        }
       }
     })();
     return ()=>{cancelled=true};
@@ -200,14 +262,14 @@ export const AppProvider: React.FC<{children:React.ReactNode}> = ({children}) =>
   const totalCoursesCount=courses.length;
 
   const login=async(email:string,password='')=>{
-    try{const r=await api<any>('/auth/login',{method:'POST',body:JSON.stringify({email:email.trim(),password:password.trim()})});setToken(r.token);setCurrentUser(r.user);if(r.requiresEmailVerification){localStorage.setItem('tah_verify_email',r.user.email);localStorage.setItem('tah_verify_purpose','registration');setCurrentView('auth-verify');return {success:true,role:r.user.role as UserRole,message:'Please verify your email.'};}setCurrentView(r.user.role==='admin'?'admin-dashboard':'student-dashboard');const boot=r.user.role==='student'?await api<any>('/student/bootstrap'):null;if(boot)applyBootstrap(boot.data);if(r.user.role==='admin'){const [p,c]=await Promise.all([api<any>('/admin/payments'),api<any>('/admin/certificates')]);setPayments(p.payments);setCertificates(c.certificates.map(toCertificate))}showToast(`Welcome back, ${r.user.name}!`);return {success:true,role:r.user.role as UserRole}}catch(e:any){showToast(e.message||'Unable to log in.');return {success:false,message:e.message}}};
+    try{const r=await api<any>('/auth/login',{method:'POST',body:JSON.stringify({email:email.trim(),password:password.trim()})});if(r.requiresEmailVerification){clearToken();setCurrentUser(null);localStorage.setItem('tah_verify_email',r.email||email.trim().toLowerCase());localStorage.setItem('tah_verify_purpose','registration');localStorage.setItem('tah_verify_started',String(Date.now()));setCurrentView('auth-verify');showToast(r.message||'Please verify your email address to continue.');return {success:true,role:'student' as UserRole,message:'Please verify your email.'};}setToken(r.token);setCurrentUser(r.user);setCurrentView(r.user.role==='admin'?'admin-dashboard':'student-dashboard');const boot=r.user.role==='student'?await api<any>('/student/bootstrap'):null;if(boot)applyBootstrap(boot.data);if(r.user.role==='admin'){const [p,c]=await Promise.all([api<any>('/admin/payments'),api<any>('/admin/certificates')]);setPayments(p.payments);setCertificates(c.certificates.map(toCertificate))}showToast(`Welcome back, ${r.user.name}!`);return {success:true,role:r.user.role as UserRole}}catch(e:any){showToast(e.message||'Unable to log in.');return {success:false,message:e.message}}};
 
   const signInWithGoogle=async(credential:string)=>{try{const r=await api<any>('/auth/google',{method:'POST',body:JSON.stringify({credential})});setToken(r.token);setCurrentUser(r.user);setCurrentView(r.user.role==='admin'?'admin-dashboard':'student-dashboard');if(r.user.role==='student'){const boot=await api<any>('/student/bootstrap');applyBootstrap(boot.data)}showToast(`Welcome, ${r.user.name}!`)}catch(e:any){showToast(e.message||'Google sign-in failed.')}};
 
   const register=async(name:string,email:string,phone?:string,password?:string)=>{
-    try{const r=await api<any>('/auth/register',{method:'POST',body:JSON.stringify({name,email,phone,password})});setToken(r.token);setCurrentUser(r.user);localStorage.setItem('tah_verify_email',email.trim().toLowerCase());localStorage.setItem('tah_verify_purpose','registration');setCurrentView('auth-verify');showToast('Account created. Check your email for the verification link or OTP.')}catch(e:any){showToast(e.message||'Unable to create account.')}}
+    try{const r=await api<any>('/auth/register',{method:'POST',body:JSON.stringify({name,email,phone,password})});clearToken();setCurrentUser(null);localStorage.setItem('tah_verify_email',r.email||email.trim().toLowerCase());localStorage.setItem('tah_verify_purpose','registration');localStorage.setItem('tah_verify_started',String(Date.now()));setCurrentView('auth-verify');showToast(r.message||'Account created. Open the verification link we emailed you.')}catch(e:any){showToast(e.message||'Unable to create account.')}}
   const logout=()=>setLogoutConfirmOpen(true);
-  const confirmLogout=()=>{setLogoutConfirmOpen(false);clearToken();setCurrentUser(null);setProgressMap({});setCertificates([]);setChatThreads([]);setNotifications([]);setPayments([]);setCurrentView('landing');showToast('Logged out successfully.')};
+  const confirmLogout=()=>{setLogoutConfirmOpen(false);clearToken();setCurrentUser(null);localStorage.removeItem('tah_verify_email');localStorage.removeItem('tah_verify_purpose');localStorage.removeItem('tah_verify_started');setProgressMap({});setCertificates([]);setChatThreads([]);setNotifications([]);setPayments([]);setCurrentView('landing');showToast('Logged out successfully.')};
   const cancelLogout=()=>setLogoutConfirmOpen(false);
   const switchToRole=(role:'student'|'admin'|'guest')=>{
   if(role==='guest') logout();
@@ -226,8 +288,6 @@ export const AppProvider: React.FC<{children:React.ReactNode}> = ({children}) =>
   const resendPasswordResetOtp=async(email:string)=>{try{const r=await api<any>('/auth/resend-password-reset-otp',{method:'POST',body:JSON.stringify({email})});showToast(r.message||'New OTP sent.')}catch(e:any){showToast(e.message||'Unable to resend OTP.')}};
   const resetPassword=async(newPassword:string,token?:string)=>{
     try{const email=localStorage.getItem('tah_reset_email')||'';const resetToken=token||localStorage.getItem('tah_reset_token')||new URLSearchParams(window.location.search).get('resetToken')||'';await api('/auth/reset-password',{method:'POST',body:JSON.stringify({email,token:resetToken,newPassword})});localStorage.removeItem('tah_reset_email');localStorage.removeItem('tah_reset_token');localStorage.removeItem('tah_verify_purpose');showToast('Password updated successfully! Please log in.')}catch(e:any){showToast(e.message||'Unable to reset password.')}};
-  const verifyEmail=async()=>{try{const r=await api<any>('/auth/verify-email',{method:'POST'});setCurrentUser(r.user);showToast('Email verified successfully.')}catch(e:any){showToast(e.message||'Unable to verify email.')}};
-  const verifyEmailOtp=async(email:string,otp:string)=>{try{const r=await api<any>('/auth/verify-email-otp',{method:'POST',body:JSON.stringify({email,otp})});setCurrentUser(r.user);localStorage.removeItem('tah_verify_purpose');localStorage.removeItem('tah_verify_email');showToast('Email verified successfully! Welcome to ThinkAHead Learning Hub.');setCurrentView('student-dashboard')}catch(e:any){showToast(e.message||'Unable to verify email.')}};
   const resendVerificationEmail=async(email:string)=>{try{const r=await api<any>('/auth/resend-verification',{method:'POST',body:JSON.stringify({email})});showToast(r.message||'Verification email resent.')}catch(e:any){showToast(e.message||'Unable to resend verification email.')}};
 
   const markLessonComplete=async(courseId:string,lessonId:string)=>{
@@ -298,7 +358,7 @@ export const AppProvider: React.FC<{children:React.ReactNode}> = ({children}) =>
   const subscribeNewsletter=async(email:string)=>{try{await api('/public/newsletter',{method:'POST',body:JSON.stringify({email})});showToast('Subscribed to ThinkAHead updates!')}catch(e:any){showToast(e.message)}};
 
   const value:AppContextType={
-    theme,setTheme,toggleTheme,currentView,setCurrentView,searchQuery,setSearchQuery,currentUser,setCurrentUser,switchToRole,login,register,logout,confirmLogout,cancelLogout,logoutConfirmOpen,updateProfile,uploadProfilePhoto,updateSettings,signInWithGoogle,requestPasswordReset,verifyPasswordResetOtp,resendPasswordResetOtp,resetPassword,verifyEmail,verifyEmailOtp,resendVerificationEmail,
+    theme,setTheme,toggleTheme,currentView,setCurrentView,searchQuery,setSearchQuery,currentUser,setCurrentUser,switchToRole,login,register,logout,confirmLogout,cancelLogout,logoutConfirmOpen,updateProfile,uploadProfilePhoto,updateSettings,signInWithGoogle,requestPasswordReset,verifyPasswordResetOtp,resendPasswordResetOtp,resetPassword,resendVerificationEmail,
     courses,selectedCourseId,setSelectedCourseId,activeCourse,isCourseUnlocked,subscriptionUnlockedMonths,
     progressMap,markLessonComplete,saveLessonNote,submitAssignment,submitQuiz,completeCourse,enrollInCourse,
     completedCoursesCount,totalCoursesCount,enrolledCoursesCount,overallProgressPercent,masterCertificate,completeAllCoursesForDemo,openMasterCertificate,certificates,activeCertificate,setActiveCertificate,
