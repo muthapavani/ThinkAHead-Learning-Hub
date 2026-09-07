@@ -215,7 +215,10 @@ async function sendOtpEmail(user, otp, purpose = 'verification') {
   return sendEmail({ to: user.email, subject: `${brand} – Your ${label} OTP`, html: layout(`Your ${label} code`, `<p style="font-size:15px;line-height:1.6">Hi ${escapeHtml(user.name)},</p><p>Use this code. It expires in <strong>${ttlMinutes} minutes</strong>.</p><div style="font-size:32px;letter-spacing:9px;font-weight:800;text-align:center;padding:18px;background:#eff6ff;border-radius:14px;color:#1d4ed8">${otp}</div><p style="font-size:12px;color:#64748b">Never share this code.</p>`), text: `Hi ${user.name}, your ${label} OTP is ${otp}. It expires in ${ttlMinutes} minutes.` });
 }
 async function sendVerificationEmail(user, token) {
-  const link = `${publicApiUrl}/api/auth/verify-email-link?token=${encodeURIComponent(token)}`;
+  // Point at the frontend, not the API host. The app exchanges this token via a
+  // background request, so the browser never navigates to the backend domain -
+  // which is what triggers Chrome's Safe Browsing warning on shared hosts.
+  const link = `${clientUrl.replace(/\/$/, '')}/?verifyToken=${encodeURIComponent(token)}`;
   const linkTtl = Number(process.env.EMAIL_VERIFICATION_TTL_MINUTES || 60);
   return sendEmail({
     to: user.email,
