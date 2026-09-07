@@ -40,6 +40,10 @@ const userSchema = new mongoose.Schema({
   // start a real session instead of sending the person back to the login form.
   sessionClaimTokenHash: String,
   sessionClaimExpires: Date,
+  // Secret handed only to the browser that submitted the registration form, so
+  // that tab can be signed in once the email is verified on another device.
+  pendingSessionTokenHash: String,
+  pendingSessionExpires: Date,
   emailVerificationExpires: Date,
   emailVerificationOtpHash: String,
   emailVerificationOtpExpires: Date,
