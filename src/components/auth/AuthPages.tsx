@@ -184,6 +184,7 @@ export const AuthPages: React.FC = () => {
     register,
     requestPasswordReset,
     verifyPasswordResetOtp,
+    completeVerifiedSession,
     resendPasswordResetOtp,
     resetPassword,
     resendVerificationEmail,
@@ -218,6 +219,25 @@ export const AuthPages: React.FC = () => {
     const check = async () => {
       try {
         const base = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+        // The secret from registration lets this tab claim a session the moment
+        // the link is opened, even when that happens on a phone.
+        const pendingToken = localStorage.getItem('tah_pending_token');
+        if (pendingToken) {
+          const res = await fetch(`${base}/auth/await-verification`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pendingToken })
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (stopped || !data?.verified) return;
+          stopped = true;
+          await completeVerifiedSession(data.token, data.user);
+          return;
+        }
+
+        // No secret in this browser (link opened in a fresh tab, or an older
+        // registration). Fall back to reporting status only.
         const res = await fetch(`${base}/auth/verification-status?email=${encodeURIComponent(pending)}`);
         if (!res.ok) return;
         const data = await res.json();
@@ -225,6 +245,7 @@ export const AuthPages: React.FC = () => {
         stopped = true;
         localStorage.removeItem('tah_verify_email');
         localStorage.removeItem('tah_verify_purpose');
+        localStorage.removeItem('tah_verify_started');
         showToast('Email verified successfully. Please sign in to continue.');
         setCurrentView('auth-login');
       } catch { /* offline or backend asleep - just try again next tick */ }
