@@ -131,7 +131,32 @@ export const AppProvider: React.FC<{children:React.ReactNode}> = ({children}) =>
       const resetToken=params.get('resetToken');
       const resetEmail=params.get('email');
       const claim=params.get('claim');
+      const verifyToken=params.get('verifyToken');
       if(resetToken){localStorage.setItem('tah_reset_token',resetToken);if(resetEmail)localStorage.setItem('tah_reset_email',resetEmail);setCurrentView('auth-reset');}
+
+      // Arriving from the "Verify My Email" button. The token is exchanged with
+      // a background request so the browser stays on this domain throughout.
+      if(verifyToken){
+        window.history.replaceState({},'',window.location.pathname);
+        try {
+          const r=await api<any>('/auth/verify-email-token',{method:'POST',body:JSON.stringify({token:verifyToken})});
+          if(cancelled)return;
+          setToken(r.token);
+          setCurrentUser(r.user);
+          localStorage.removeItem('tah_verify_email');
+          localStorage.removeItem('tah_verify_purpose');
+          localStorage.removeItem('tah_verify_started');
+          setCurrentView(r.user.role==='admin'?'admin-dashboard':'student-dashboard');
+          showToast('Email verified. Welcome to ThinkAHead Learning Hub!');
+          if(r.user.role==='student'){try{const boot=await api<any>('/student/bootstrap');if(!cancelled)applyBootstrap(boot.data)}catch{}}
+          return;
+        } catch(e:any){
+          if(cancelled)return;
+          setCurrentView('auth-login');
+          showToast(e.message||'This verification link is invalid or has expired. Please sign in or request a new one.');
+          return;
+        }
+      }
 
       // Arriving back from the "Verify My Email" link: trade the one-time token
       // for a session so this tab lands on the dashboard, already signed in.
