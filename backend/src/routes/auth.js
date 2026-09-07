@@ -43,10 +43,9 @@ router.post('/register', async (req,res,next) => {
     user.emailVerificationExpires=new Date(Date.now()+Number(process.env.EMAIL_VERIFICATION_TTL_MINUTES||60)*60000);
     user.otpAttempts=0;
     await user.save();
-    await Promise.all([
-      sendVerificationEmail(user,verificationToken).catch(e => console.error('[auth/register] verification email failed:', e.message)),
-      sendAdminNotification('New student registration', `<p><strong>${user.name}</strong> registered with ${user.email}.</p><p>Registration time: ${new Date().toLocaleString('en-IN',{timeZone:process.env.EMAIL_TIMEZONE||'Asia/Kolkata'})}</p>`, `New student registration: ${user.name} (${user.email}).`)
-    ]);
+    // Admins are told once, after the email is verified - an unverified signup
+    // is not yet a real student, and every extra mail eats the daily quota.
+    await sendVerificationEmail(user,verificationToken).catch(e => console.error('[auth/register] verification email failed:', e.message));
     // No session token is issued here on purpose. An account that has not
     // confirmed its email address must not be able to reach the dashboard,
     // and a token in localStorage would survive a page reload.
@@ -173,7 +172,7 @@ router.post('/verify-email-token', async (req,res,next)=>{
     user.emailVerified=true;user.emailVerificationTokenHash=undefined;user.emailVerificationExpires=undefined;user.emailVerificationOtpHash=undefined;user.emailVerificationOtpExpires=undefined;user.otpAttempts=0;await user.save();
     await Promise.all([
       sendWelcomeEmail(user).catch(e=>console.error('[auth/verify] welcome email failed:',e.message)),
-      sendAdminNotification('Student email verified', `<p><strong>${user.name}</strong> verified ${user.email}.</p>`, `Student email verified: ${user.name} (${user.email}).`)
+      sendAdminNotification('New user registered', `<p>A new student has completed registration and verified their email.</p><table style="margin:16px auto;text-align:left;font-size:14px"><tr><td style="padding:4px 12px 4px 0;color:#64748b">Name</td><td><strong>${user.name}</strong></td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Email</td><td>${user.email}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Phone</td><td>${user.phone||'-'}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Signed up via</td><td>${user.authProvider==='google'?'Google':'Email'}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Time</td><td>${new Date().toLocaleString('en-IN',{timeZone:process.env.EMAIL_TIMEZONE||'Asia/Kolkata'})}</td></tr></table>`, `New user registered: ${user.name} (${user.email}).`)
     ]);
     res.json({success:true,token:signToken(user),user:publicUser(user)});
   } catch(e){next(e)}
@@ -202,7 +201,7 @@ router.get('/verify-email-link', async (req,res,next)=>{
     const user=await User.findOne({emailVerificationTokenHash:tokenHash,emailVerificationExpires:{$gt:new Date()}});
     if(!user) return res.status(400).send('This verification link is invalid or expired. Please request a new verification email.');
     user.emailVerified=true;user.emailVerificationTokenHash=undefined;user.emailVerificationExpires=undefined;user.emailVerificationOtpHash=undefined;user.emailVerificationOtpExpires=undefined;user.otpAttempts=0;await user.save();
-    await Promise.all([sendWelcomeEmail(user),sendAdminNotification('Student email verified', `<p><strong>${user.name}</strong> verified ${user.email}.</p>`, `Student email verified: ${user.name} (${user.email}).`)]);
+    await Promise.all([sendWelcomeEmail(user),sendAdminNotification('New user registered', `<p>A new student has completed registration and verified their email.</p><table style="margin:16px auto;text-align:left;font-size:14px"><tr><td style="padding:4px 12px 4px 0;color:#64748b">Name</td><td><strong>${user.name}</strong></td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Email</td><td>${user.email}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Phone</td><td>${user.phone||'-'}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Signed up via</td><td>${user.authProvider==='google'?'Google':'Email'}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Time</td><td>${new Date().toLocaleString('en-IN',{timeZone:process.env.EMAIL_TIMEZONE||'Asia/Kolkata'})}</td></tr></table>`, `New user registered: ${user.name} (${user.email}).`)]);
     // Hand this tab a one-time claim token so it can open the dashboard already
     // signed in, instead of bouncing the person back to the login form.
     const claim=randomToken();
@@ -243,7 +242,7 @@ router.post('/verify-otp', async (req,res,next)=>{
     if((user.otpAttempts||0)>=5) return res.status(429).json({success:false,message:'Too many OTP attempts. Please request a new code.'});
     if(hash(String(req.body.otp).trim())!==user.emailVerificationOtpHash){user.otpAttempts=(user.otpAttempts||0)+1;await user.save();return res.status(400).json({success:false,message:'OTP is invalid or expired.'});}
     user.emailVerified=true;user.emailVerificationOtpHash=undefined;user.emailVerificationOtpExpires=undefined;user.emailVerificationTokenHash=undefined;user.emailVerificationExpires=undefined;user.otpAttempts=0;await user.save();
-    void sendWelcomeEmail(user);void sendAdminNotification('Student email verified', `<p><strong>${user.name}</strong> verified ${user.email}.</p>`, `Student email verified: ${user.name} (${user.email}).`);
+    void sendWelcomeEmail(user);void sendAdminNotification('New user registered', `<p>A new student has completed registration and verified their email.</p><table style="margin:16px auto;text-align:left;font-size:14px"><tr><td style="padding:4px 12px 4px 0;color:#64748b">Name</td><td><strong>${user.name}</strong></td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Email</td><td>${user.email}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Phone</td><td>${user.phone||'-'}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Signed up via</td><td>${user.authProvider==='google'?'Google':'Email'}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Time</td><td>${new Date().toLocaleString('en-IN',{timeZone:process.env.EMAIL_TIMEZONE||'Asia/Kolkata'})}</td></tr></table>`, `New user registered: ${user.name} (${user.email}).`);
     res.json({success:true,message:'OTP verified successfully.',user:publicUser(user),token:signToken(user)});
   } catch(e){next(e)}
 });
@@ -281,7 +280,8 @@ router.post('/google', async (req,res,next)=>{
       }
     }
     if(isNewGoogleUser){
-      void sendAdminNotification('New student registration', `<p><strong>${user.name}</strong> registered using Google with ${user.email}.</p>`, `New Google student registration: ${user.name} (${user.email}).`);
+      // Google accounts arrive already verified, so this is the one notification.
+      void sendAdminNotification('New user registered', `<p>A new student has joined using Google Sign-In. Google accounts are verified on arrival.</p><table style="margin:16px auto;text-align:left;font-size:14px"><tr><td style="padding:4px 12px 4px 0;color:#64748b">Name</td><td><strong>${user.name}</strong></td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Email</td><td>${user.email}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Signed up via</td><td>Google</td></tr><tr><td style="padding:4px 12px 4px 0;color:#64748b">Time</td><td>${new Date().toLocaleString('en-IN',{timeZone:process.env.EMAIL_TIMEZONE||'Asia/Kolkata'})}</td></tr></table>`, `New user registered via Google: ${user.name} (${user.email}).`);
     }
     res.json({success:true,token:signToken(user),user:publicUser(user)});
   } catch(e){
