@@ -371,8 +371,27 @@ export const AdminCoursesView: React.FC = () => {
   const [adminCourses, setAdminCourses] = useState<any[]>(courses);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
 
   useEffect(() => { setAdminCourses(courses as any[]); }, [courses]);
+
+  // Sends the file to the backend, which stores it and returns a public URL.
+  // The URL is written straight into the field the button belongs to.
+  const uploadImage = async (field: string, file: File) => {
+    if (file.size > 3 * 1024 * 1024) { showToast('That image is over 3MB. Please compress it first (try squoosh.app).'); return; }
+    setUploadingField(field);
+    try {
+      const form = new FormData();
+      form.append('image', file);
+      const r = await api<any>('/admin/uploads/image', { method: 'POST', body: form });
+      setEditing((prev: any) => ({ ...prev, [field]: r.url }));
+      showToast('Image uploaded.');
+    } catch (e: any) {
+      showToast(e.message || 'Could not upload that image.');
+    } finally {
+      setUploadingField(null);
+    }
+  };
 
   const blankLesson = (order: number) => ({
     id: `les-${Date.now()}-${order}`,
@@ -572,8 +591,25 @@ export const AdminCoursesView: React.FC = () => {
               <h3 className="font-black text-sm">1. Course Information</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
-                  ['title','Course Name'],['shortDescription','Short Description'],['thumbnail','Course Image URL'],['bannerImage','Banner Image URL']
-                ].map(([key,label])=><label key={key} className={key==='shortDescription'?'sm:col-span-2':''}><span className="block text-[11px] font-bold text-slate-500 mb-1">{label}</span><input required={key==='title'||key==='shortDescription'} value={editing[key]||''} onChange={e=>setEditing({...editing,[key]:e.target.value})} className="w-full px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-sm"/></label>)}
+                  ['title','Course Name'],['shortDescription','Short Description'],['thumbnail','Course Image'],['bannerImage','Banner Image']
+                ].map(([key,label])=>{
+                  const isImage = key==='thumbnail' || key==='bannerImage';
+                  return (
+                  <label key={key} className={key==='shortDescription'?'sm:col-span-2':''}>
+                    <span className="block text-[11px] font-bold text-slate-500 mb-1">{label}</span>
+                    <input required={key==='title'||key==='shortDescription'} value={editing[key]||''} onChange={e=>setEditing({...editing,[key]:e.target.value})} placeholder={isImage?'Upload a file, or paste a link':''} className="w-full px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-sm"/>
+                    {isImage && (
+                      <div className="flex items-center gap-3 mt-2">
+                        <label className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer ${uploadingField===key?'bg-slate-300 text-slate-600 cursor-wait':'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
+                          {uploadingField===key ? 'Uploading…' : 'Upload image'}
+                          <input type="file" accept="image/*" disabled={!!uploadingField} className="hidden" onChange={e=>{const f=e.target.files?.[0]; e.currentTarget.value=''; if(f)void uploadImage(key,f);}}/>
+                        </label>
+                        {editing[key] ? <img src={editing[key]} alt="" className="h-9 w-14 object-cover rounded-md border border-slate-200 dark:border-slate-700"/> : <span className="text-[10px] text-slate-400">JPG, PNG or WebP · under 3MB</span>}
+                        {editing[key] && <button type="button" onClick={()=>setEditing({...editing,[key]:''})} className="text-[11px] font-bold text-rose-500">Remove</button>}
+                      </div>
+                    )}
+                  </label>);
+                })}
                 <label><span className="block text-[11px] font-bold text-slate-500 mb-1">Category</span><select value={editing.category||'Professional Skills'} onChange={e=>setEditing({...editing,category:e.target.value})} className="w-full px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-sm"><option>Personal Growth</option><option>Professional Skills</option><option>Leadership</option><option>Future Skills</option></select></label>
                 <label><span className="block text-[11px] font-bold text-slate-500 mb-1">Release Month</span><input type="number" min="1" max="12" value={editing.monthUnlock||1} onChange={e=>setEditing({...editing,monthUnlock:Number(e.target.value)})} className="w-full px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-sm"/></label>
                 <label className="sm:col-span-2 flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700"><input type="checkbox" checked={!!editing.isFree} onChange={e=>setEditing({...editing,isFree:e.target.checked,monthUnlock:e.target.checked?1:editing.monthUnlock})}/><span className="text-xs font-bold">Free course — available as part of the initial free access</span></label>
