@@ -783,7 +783,7 @@ export const NotificationsView: React.FC = () => {
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-5xl mx-auto">
       <div>
-        <button onClick={() => setCurrentView('student-settings')} className="inline-flex items-center gap-1.5 mb-4 px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-indigo-500 hover:bg-indigo-500/10 transition-all">
+        <button onClick={() => setCurrentView('student-settings')} className="inline-flex items-center gap-1.5 mb-4 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
           <ArrowLeft className="w-4 h-4" /> Back to Settings
         </button>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 dark:text-blue-400 text-xs font-bold mb-2">
@@ -838,7 +838,7 @@ export const ProgressView: React.FC = () => {
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-7xl mx-auto">
       <div>
-        <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 mb-4 px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-blue-500 hover:bg-blue-500/10 transition-all">
+        <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 mb-4 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
           <ArrowLeft className="w-4 h-4" /> Back to Dashboard
         </button>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-500 text-xs font-bold mb-2">
@@ -1092,7 +1092,7 @@ export const SettingsView: React.FC = () => {
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-4xl mx-auto">
       <div>
-        <button onClick={() => setCurrentView('student-profile')} className="inline-flex items-center gap-1.5 mb-4 px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-indigo-500 hover:bg-indigo-500/10 transition-all">
+        <button onClick={() => setCurrentView('student-profile')} className="inline-flex items-center gap-1.5 mb-4 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
           <ArrowLeft className="w-4 h-4" /> Back to Profile
         </button>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-bold mb-2">
