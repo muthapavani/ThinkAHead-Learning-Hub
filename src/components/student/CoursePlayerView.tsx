@@ -331,9 +331,9 @@ export const CoursePlayerView: React.FC = () => {
       </div>
 
       {/* Main Workspace Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 max-w-[1600px] mx-auto">
-        {/* Left Video Player & Tabs Column */}
-        <div className="lg:col-span-8 p-4 sm:p-6 space-y-6">
+      <div className="flex flex-col max-w-[1100px] mx-auto w-full">
+        {/* Video player, tabs, then the module list underneath */}
+        <div className="p-4 sm:p-6 space-y-6">
           {/* 1. Custom Interactive Video Player */}
           <div className="relative aspect-video rounded-3xl overflow-hidden bg-black border border-slate-800 shadow-2xl group flex flex-col justify-between">
             {/* Admin-managed course video. YouTube and Vimeo links are embedded,
@@ -403,16 +403,6 @@ export const CoursePlayerView: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <button
-                onClick={handleLessonNext}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/30 transition-all flex items-center justify-center gap-2"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Mark Complete & Next</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
           </div>
 
           {showCompletionCelebration && (
@@ -569,13 +559,24 @@ export const CoursePlayerView: React.FC = () => {
                           <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-mono">{res.type} • {res.size}</span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => showToast(`Downloaded: ${res.title}`)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-blue-600 hover:text-white dark:bg-slate-700 dark:hover:bg-blue-600 text-slate-700 dark:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download</span>
-                      </button>
+                      {/* A real link, so the browser actually saves the file.
+                          download=1 makes the API send Content-Disposition:
+                          attachment instead of opening it in the PDF viewer. */}
+                      {res.downloadUrl ? (
+                        <a
+                          href={`${res.downloadUrl}${res.downloadUrl.includes('?') ? '&' : '?'}download=1`}
+                          download={res.fileName || `${res.title}.pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => showToast(`Downloading: ${res.title}`)}
+                          className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-blue-600 hover:text-white dark:bg-slate-700 dark:hover:bg-blue-600 text-slate-700 dark:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download</span>
+                        </a>
+                      ) : (
+                        <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 text-xs font-semibold">Not uploaded</span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -587,7 +588,7 @@ export const CoursePlayerView: React.FC = () => {
         </div>
 
         {/* Right Sidebar: Curriculum Module Accordion */}
-        <div className={`lg:col-span-4 p-4 sm:p-6 border-t lg:border-t-0 lg:border-l space-y-6 ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`}>
+        <div className={`p-4 sm:p-6 border-t space-y-6 ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`}>
           {/* Modules List */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">
