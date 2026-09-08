@@ -8,16 +8,28 @@ const { Contact, Newsletter } = require('../models/Contact');
 const { sendAdminNotification, sendContactAcknowledgement } = require('../utils/email');
 const router=express.Router();
 
-// Serves an uploaded image by id. Cached hard by the browser because the bytes
-// behind an id never change - a replacement upload gets a new id.
+// A lean() read returns Mongoose Buffer fields as a BSON Binary rather than a
+// Node Buffer. Buffer.from(Binary) silently yields zero bytes - which is how
+// uploads ended up serving 200 responses with an empty body - so unwrap it.
+function toBuffer(value) {
+  if (!value) return null;
+  if (Buffer.isBuffer(value)) return value;
+  if (Buffer.isBuffer(value.buffer)) return value.buffer;              // BSON Binary
+  if (typeof value.value === 'function') return Buffer.from(value.value(true));
+  if (Array.isArray(value.data)) return Buffer.from(value.data);       // { type:'Buffer', data:[...] }
+  return null;
+}
+
+// Serves an uploaded image or PDF by id. Cached hard by the browser because the
+// bytes behind an id never change - a replacement upload gets a new id.
 router.get('/media/:id', async (req,res,next)=>{
   try {
     if(!/^[0-9a-fA-F]{24}$/.test(req.params.id)) return res.status(404).end();
     const media=await Media.findById(req.params.id).lean();
-    // An empty Buffer is still truthy, so check the length or a blank record
-    // would be served as a valid but invisible image.
-    if(!media?.data?.length) return res.status(404).end();
+    const bytes=toBuffer(media?.data);
+    if(!bytes?.length) return res.status(404).end();
     res.set('Content-Type',media.mimeType||'image/jpeg');
+    res.set('Content-Length',String(bytes.length));
     res.set('Cache-Control','public, max-age=31536000, immutable');
     res.set('Cross-Origin-Resource-Policy','cross-origin');
     // PDFs open in the browser's viewer; ?download=1 saves the file instead.
@@ -25,9 +37,10 @@ router.get('/media/:id', async (req,res,next)=>{
       const safe=String(media.name||'document.pdf').replace(/[^\w.\- ]+/g,'_');
       res.set('Content-Disposition',`${req.query.download?'attachment':'inline'}; filename="${safe}"`);
     }
-    res.send(Buffer.from(media.data));
+    res.end(bytes);
   } catch(e){next(e)}
 });
+
 
 
 router.get('/bootstrap', async (req,res,next)=>{
