@@ -434,12 +434,14 @@ export const AdminCoursesView: React.FC = () => {
       instructor: { name: 'IHCDR Faculty', title: 'Capability Development Mentor', avatar: '', experience: '' },
       modules: [{ id: `mod-${Date.now()}`, title: 'Module 1', lessons: [blankLesson(1)] }],
       resources: [], assignments: [],
-      quiz: { id: `quiz-${Date.now()}`, title: 'Course Quiz', durationMinutes: 10, passingScorePercentage: 70, questions: [] },
+      startingQuiz: { id: `sq-${Date.now()}`, title: 'Starting Quiz', questions: [] },
+      quiz: { id: `quiz-${Date.now()}`, title: 'Final Quiz', durationMinutes: 10, passingScorePercentage: 70, questions: [] },
       learningOutcomes: []
     };
     c.modules = c.modules?.length ? c.modules : [{ id: `mod-${Date.now()}`, title: 'Module 1', lessons: [blankLesson(1)] }];
     c.resources = c.resources || [];
-    c.quiz = c.quiz || { id: `quiz-${Date.now()}`, title: `${c.title} Quiz`, durationMinutes: 10, passingScorePercentage: 70, questions: [] };
+    c.quiz = c.quiz || { id: `quiz-${Date.now()}`, title: `${c.title} Final Quiz`, durationMinutes: 10, passingScorePercentage: 70, questions: [] };
+    c.startingQuiz = c.startingQuiz || { id: `sq-${Date.now()}`, title: `${c.title} Starting Quiz`, questions: [] };
     setEditing(c);
     setEditorOpen(true);
   };
@@ -477,32 +479,32 @@ export const AdminCoursesView: React.FC = () => {
     }));
   };
 
-  const updateQuizQuestion = (questionIndex:number, field:string, value:any) => {
+  const updateQuizQuestion = (quizKey:'quiz'|'startingQuiz', questionIndex:number, field:string, value:any) => {
     setEditing((p:any) => {
-      const quiz = p.quiz || { questions: [] };
+      const quiz = p[quizKey] || { questions: [] };
       const questions = [...(quiz.questions || [])];
       questions[questionIndex] = { ...questions[questionIndex], [field]: value };
-      return { ...p, quiz: { ...quiz, questions } };
+      return { ...p, [quizKey]: { ...quiz, questions } };
     });
   };
 
-  const updateQuizOption = (questionIndex:number, optionIndex:number, value:string) => {
+  const updateQuizOption = (quizKey:'quiz'|'startingQuiz', questionIndex:number, optionIndex:number, value:string) => {
     setEditing((p:any) => {
-      const quiz = p.quiz || { questions: [] };
+      const quiz = p[quizKey] || { questions: [] };
       const questions = [...(quiz.questions || [])];
       const question = { ...(questions[questionIndex] || {}), options: [...(questions[questionIndex]?.options || ['', '', '', ''])] };
       question.options[optionIndex] = value;
       questions[questionIndex] = question;
-      return { ...p, quiz: { ...quiz, questions } };
+      return { ...p, [quizKey]: { ...quiz, questions } };
     });
   };
 
-  const addQuizQuestion = () => {
+  const addQuizQuestion = (quizKey:'quiz'|'startingQuiz') => {
     setEditing((prev:any) => ({
       ...prev,
-      quiz: {
-        ...(prev.quiz || {}),
-        questions: [...(prev.quiz?.questions || []), {
+      [quizKey]: {
+        ...(prev[quizKey] || { id:`${quizKey}-${Date.now()}`, title: quizKey==='quiz' ? 'Final Quiz' : 'Starting Quiz', passingScorePercentage: quizKey==='quiz' ? 70 : 0 }),
+        questions: [...(prev[quizKey]?.questions || []), {
           id:`q-${Date.now()}`, question:'', options:['','','',''], correctAnswer:0, explanation:''
         }]
       }
@@ -552,7 +554,8 @@ export const AdminCoursesView: React.FC = () => {
         bannerImage: editing.bannerImage || editing.thumbnail || '/assets/images/hero-growth-journey.png',
         fullDescription: editing.fullDescription || editing.shortDescription,
         resources: editing.resources || [],
-        quiz: editing.quiz || { id:`quiz-${Date.now()}`, title:`${editing.title} Quiz`, durationMinutes:10, passingScorePercentage:70, questions:[] }
+        quiz: editing.quiz || { id:`quiz-${Date.now()}`, title:`${editing.title} Final Quiz`, durationMinutes:10, passingScorePercentage:70, questions:[] },
+        startingQuiz: editing.startingQuiz || { id:`sq-${Date.now()}`, title:`${editing.title} Starting Quiz`, questions:[] }
       };
       const response = editing.id
         ? await api<any>(`/admin/courses/${editing.id}`, { method:'PATCH', body:JSON.stringify(payload) })
@@ -681,22 +684,42 @@ export const AdminCoursesView: React.FC = () => {
             </section>
 
             <section className="space-y-4">
-              <div className="flex items-center justify-between"><div><h3 className="font-black text-sm">4. Quiz</h3><p className="text-[11px] text-slate-500">Quiz performance is stored per learner and automatically feeds admin analytics.</p></div><button type="button" onClick={addQuizQuestion} className="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold"><Plus className="w-3.5 h-3.5 inline mr-1"/> Add Quiz Question</button></div>
-              <div className="grid grid-cols-2 gap-3"><input value={editing.quiz?.title||''} onChange={e=>setEditing((p:any)=>({...p,quiz:{...p.quiz,title:e.target.value}}))} placeholder="Quiz title" className="px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-xs"/><input type="number" min="1" value={editing.quiz?.passingScorePercentage||70} onChange={e=>setEditing((p:any)=>({...p,quiz:{...p.quiz,passingScorePercentage:Number(e.target.value)}}))} placeholder="Pass % " className="px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-xs"/></div>
-              {(editing.quiz?.questions || []).map((q:any, qi:number) => (
-                <div key={q.id} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
-                  <input value={q.question || ''} onChange={e => updateQuizQuestion(qi, 'question', e.target.value)} placeholder={`Question ${qi + 1}`} className="w-full px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-xs font-bold" />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {(q.options || ['', '', '', '']).map((o:string, oi:number) => (
-                      <input key={oi} value={o} onChange={e => updateQuizOption(qi, oi, e.target.value)} placeholder={`Option ${oi + 1}`} className="px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-xs" />
-                    ))}
+              {/* Both quizzes are edited the same way, so the block is rendered twice. */}
+              {([
+                ['startingQuiz','4. Starting Quiz','Taken before the first lesson to gauge the learner\'s starting level. It is not gated and does not affect course completion.'],
+                ['quiz','5. Final Quiz','Unlocks only after every lesson is complete. Passing it completes the course and issues the certificate.']
+              ] as ['quiz'|'startingQuiz', string, string][]).map(([quizKey,heading,blurb]) => (
+                <div key={quizKey} className="space-y-4 pt-2">
+                  <div className="flex items-center justify-between">
+                    <div><h3 className="font-black text-sm">{heading}</h3><p className="text-[11px] text-slate-500">{blurb}</p></div>
+                    <button type="button" onClick={()=>addQuizQuestion(quizKey)} className="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold"><Plus className="w-3.5 h-3.5 inline mr-1"/> Add Question</button>
                   </div>
-                  <label className="text-[10px] font-bold text-slate-500">
-                    Correct option
-                    <select value={q.correctAnswer ?? 0} onChange={e => updateQuizQuestion(qi, 'correctAnswer', Number(e.target.value))} className="ml-2 px-2 py-1 rounded-lg border">
-                      <option value={0}>1</option><option value={1}>2</option><option value={2}>3</option><option value={3}>4</option>
-                    </select>
-                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input value={editing[quizKey]?.title||''} onChange={e=>setEditing((p:any)=>({...p,[quizKey]:{...p[quizKey],title:e.target.value}}))} placeholder={quizKey==='quiz'?'Final quiz title':'Starting quiz title'} className="px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-xs"/>
+                    {quizKey==='quiz'
+                      ? <input type="number" min="1" max="100" value={editing.quiz?.passingScorePercentage||70} onChange={e=>setEditing((p:any)=>({...p,quiz:{...p.quiz,passingScorePercentage:Number(e.target.value)}}))} placeholder="Pass %" className="px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-xs"/>
+                      : <div className="px-3 py-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-[11px] text-slate-400 flex items-center">No pass mark — this quiz is diagnostic only</div>}
+                  </div>
+                  {(editing[quizKey]?.questions || []).map((q:any, qi:number) => (
+                    <div key={q.id} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+                      <input value={q.question || ''} onChange={e => updateQuizQuestion(quizKey, qi, 'question', e.target.value)} placeholder={`Question ${qi + 1}`} className="w-full px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-xs font-bold" />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {(q.options || ['', '', '', '']).map((o:string, oi:number) => (
+                          <input key={oi} value={o} onChange={e => updateQuizOption(quizKey, qi, oi, e.target.value)} placeholder={`Option ${oi + 1}`} className="px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-xs" />
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-[10px] font-bold text-slate-500">
+                          Correct option
+                          <select value={q.correctAnswer ?? 0} onChange={e => updateQuizQuestion(quizKey, qi, 'correctAnswer', Number(e.target.value))} className="ml-2 px-2 py-1 rounded-lg border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+                            <option value={0}>1</option><option value={1}>2</option><option value={2}>3</option><option value={3}>4</option>
+                          </select>
+                        </label>
+                        <button type="button" onClick={()=>setEditing((p:any)=>({...p,[quizKey]:{...p[quizKey],questions:p[quizKey].questions.filter((_:any,i:number)=>i!==qi)}}))} className="text-[11px] font-bold text-rose-500">Remove</button>
+                      </div>
+                    </div>
+                  ))}
+                  {!(editing[quizKey]?.questions || []).length && <div className="p-5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-400">No questions added yet.</div>}
                 </div>
               ))}
             </section>
