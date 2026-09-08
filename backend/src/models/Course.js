@@ -1,5 +1,21 @@
 const mongoose = require('mongoose');
 
+// Declared as its own schema on purpose. Written inline, the "type" key would
+// be read by Mongoose as a SchemaType declaration, turning the whole entry into
+// a plain String - which made every course save fail with
+// "Cast to [string] failed ... at path resources.0".
+const resourceSchema = new mongoose.Schema({
+  id: String,
+  title: String,
+  type: String,
+  fileName: String,
+  fileSize: String,
+  category: String,
+  downloadUrl: String,
+  contentSummary: String,
+  published: { type: Boolean, default: false }
+}, { _id: false });
+
 const courseSchema = new mongoose.Schema({
   id: { type: String, unique: true, index: true },
   title: { type: String, required: true },
@@ -27,10 +43,7 @@ const courseSchema = new mongoose.Schema({
       videoUrl: String, videoUrls: { type: [String], default: [] }, description: String, keyPoints: [String], order: Number
     }]
   }],
-  resources: [{
-    id: String, title: String, type: String, fileName: String, fileSize: String,
-    category: String, downloadUrl: String, contentSummary: String, published: { type: Boolean, default: false }
-  }],
+  resources: [resourceSchema],
   assignments: [{
     id: String, title: String, dueDate: String, points: Number, description: String,
     guidelines: [String]
