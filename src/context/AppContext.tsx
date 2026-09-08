@@ -279,12 +279,22 @@ export const AppProvider: React.FC<{children:React.ReactNode}> = ({children}) =>
   const enrolledCoursesCount=currentUser?.enrolledCourseIds?.filter(id=>courses.some(c=>c.id===id)).length||0;
   const enrolledIds=new Set(currentUser?.enrolledCourseIds||[]);
   const enrolledProgressCourses=courses.filter(c=>enrolledIds.has(c.id));
-  // Only average across courses the learner has actually started. A freshly-unlocked
-  // course sitting at 0% shouldn't drag down the progress of courses already finished.
-  const startedProgressCourses=enrolledProgressCourses.filter(c=>(progressMap[c.id]?.percent||0)>0);
-  const overallProgressPercent=startedProgressCourses.length?Math.round(startedProgressCourses.reduce((sum,c)=>sum+(progressMap[c.id]?.percent||0),0)/startedProgressCourses.length):0;
   const completedIds=new Set([...(currentUser?.completedCourseIds||[]), ...Object.values<StudentCourseProgress>(progressMap).filter(p=>p.isCompleted && p.percent===100).map(p=>p.courseId)]);
   const completedCoursesCount=courses.filter(c=>completedIds.has(c.id)).length;
+
+  // Overall progress is measured against the courses this learner can actually
+  // reach right now: the free ones before a subscription, and every unlocked
+  // month after it. So 1 of 2 free courses reads 50%, and 1 of 8 unlocked
+  // courses reads 13%. A part-finished course counts as its own fraction.
+  const unlockedMonths=Number(currentUser?.subscription?.unlockedMonths||0);
+  const hasSubscription=!!currentUser?.subscription?.active;
+  const accessibleCourses=courses.filter(c=>
+    c.isFree || (hasSubscription && Number((c as any).monthUnlock||99)<=Math.max(1,unlockedMonths))
+  );
+  const progressPool=accessibleCourses.length?accessibleCourses:enrolledProgressCourses;
+  const overallProgressPercent=progressPool.length
+    ? Math.round(progressPool.reduce((sum,c)=>sum+(completedIds.has(c.id)?100:(progressMap[c.id]?.percent||0)),0)/progressPool.length)
+    : 0;
   const totalCoursesCount=courses.length;
 
   const login=async(email:string,password='')=>{
