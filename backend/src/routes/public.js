@@ -1,4 +1,5 @@
 const express = require('express');
+const Media = require('../models/Media');
 const Course = require('../models/Course');
 const Certificate = require('../models/Certificate');
 const LiveSession = require('../models/LiveSession');
@@ -6,6 +7,21 @@ const Content = require('../models/Content');
 const { Contact, Newsletter } = require('../models/Contact');
 const { sendAdminNotification, sendContactAcknowledgement } = require('../utils/email');
 const router=express.Router();
+
+// Serves an uploaded image by id. Cached hard by the browser because the bytes
+// behind an id never change - a replacement upload gets a new id.
+router.get('/media/:id', async (req,res,next)=>{
+  try {
+    if(!/^[0-9a-fA-F]{24}$/.test(req.params.id)) return res.status(404).end();
+    const media=await Media.findById(req.params.id).lean();
+    if(!media?.data) return res.status(404).end();
+    res.set('Content-Type',media.mimeType||'image/jpeg');
+    res.set('Cache-Control','public, max-age=31536000, immutable');
+    res.set('Cross-Origin-Resource-Policy','cross-origin');
+    res.send(Buffer.from(media.data));
+  } catch(e){next(e)}
+});
+
 
 router.get('/bootstrap', async (req,res,next)=>{
   try {
