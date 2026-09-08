@@ -13,6 +13,7 @@ import {
   Share2,
   Award,
   ArrowLeft,
+  ListChecks,
   ChevronDown,
   ChevronRight,
   BookOpen,
@@ -73,7 +74,7 @@ export const CoursePlayerView: React.FC = () => {
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [showCompletionCelebration, setShowCompletionCelebration] = useState(false);
   const [activeLessonIndex, setActiveLessonIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'resources'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'resources' | 'curriculum'>('overview');
 
   // Video player state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -430,6 +431,7 @@ export const CoursePlayerView: React.FC = () => {
                 { id: 'overview', label: 'Overview & Objectives', icon: <BookOpen className="w-3.5 h-3.5" /> },
                 { id: 'notes', label: 'Interactive Notes', icon: <FileText className="w-3.5 h-3.5" /> },
                 { id: 'resources', label: 'Handbooks & PDFs', icon: <Download className="w-3.5 h-3.5" /> },
+                { id: 'curriculum', label: 'Course Curriculum', icon: <ListChecks className="w-3.5 h-3.5" /> },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -583,13 +585,9 @@ export const CoursePlayerView: React.FC = () => {
               </div>
             )}
 
-
-          </div>
-        </div>
-
-        {/* Right Sidebar: Curriculum Module Accordion */}
-        <div className={`p-4 sm:p-6 border-t space-y-6 ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`}>
-          {/* Modules List */}
+            {/* TAB CONTENT: CURRICULUM */}
+            {activeTab === 'curriculum' && (
+              <div className="space-y-4">
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">
               Course Curriculum ({currentCourse.modules.length} Modules)
@@ -661,7 +659,13 @@ export const CoursePlayerView: React.FC = () => {
               </div>
             ))}
           </div>
+              </div>
+            )}
+
+
+          </div>
         </div>
+
       </div>
 
     </div>
