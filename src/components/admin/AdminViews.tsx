@@ -393,6 +393,28 @@ export const AdminCoursesView: React.FC = () => {
     }
   };
 
+  // Uploads the handout and fills in the URL, file name and size for that row.
+  const uploadPdf = async (index: number, rowId: string, file: File) => {
+    if (file.size > 10 * 1024 * 1024) { showToast('That PDF is over 10MB. Please compress it or host it elsewhere and paste the link.'); return; }
+    setUploadingField(`pdf-${rowId}`);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const r = await api<any>('/admin/uploads/pdf', { method: 'POST', body: form });
+      setEditing((prev: any) => ({
+        ...prev,
+        resources: prev.resources.map((x: any, i: number) => i === index
+          ? { ...x, downloadUrl: r.url, fileName: r.fileName, fileSize: r.fileSize, title: x.title || r.fileName.replace(/\.pdf$/i, '') }
+          : x)
+      }));
+      showToast('PDF uploaded.');
+    } catch (e: any) {
+      showToast(e.message || 'Could not upload that PDF.');
+    } finally {
+      setUploadingField(null);
+    }
+  };
+
   const blankLesson = (order: number) => ({
     id: `les-${Date.now()}-${order}`,
     title: `Lesson ${order}`,
@@ -639,8 +661,20 @@ export const AdminCoursesView: React.FC = () => {
               <div className="flex items-center justify-between"><div><h3 className="font-black text-sm">3. PDF Resources</h3><p className="text-[11px] text-slate-500">Add as many PDFs as needed. Student resource count is based on the saved PDF records.</p></div><button type="button" onClick={addPdf} className="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold"><Plus className="w-3.5 h-3.5 inline mr-1"/> Add PDF</button></div>
               {(editing.resources||[]).filter((r:any)=>r.type==='pdf').map((r:any,ri:number)=>{
                 const realIndex=(editing.resources||[]).findIndex((x:any)=>x.id===r.id);
-                return <div key={r.id} className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
-                  {['title','fileName','fileSize','downloadUrl'].map(key=><input key={key} placeholder={key==='downloadUrl'?'PDF URL / download URL':key.replace(/([A-Z])/g,' $1')} value={r[key]||''} onChange={e=>setEditing((p:any)=>({...p,resources:p.resources.map((x:any,i:number)=>i===realIndex?{...x,[key]:e.target.value}:x)}))} className="px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-xs"/>)}
+                return <div key={r.id} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {['title','fileName','fileSize','downloadUrl'].map(key=><input key={key} placeholder={key==='downloadUrl'?'Upload a PDF, or paste a link':key.replace(/([A-Z])/g,' $1')} value={r[key]||''} onChange={e=>setEditing((p:any)=>({...p,resources:p.resources.map((x:any,i:number)=>i===realIndex?{...x,[key]:e.target.value}:x)}))} className="px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-xs"/>)}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer ${uploadingField===`pdf-${r.id}`?'bg-slate-300 text-slate-600 cursor-wait':'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
+                      {uploadingField===`pdf-${r.id}` ? 'Uploading…' : 'Upload PDF'}
+                      <input type="file" accept="application/pdf" disabled={!!uploadingField} className="hidden" onChange={e=>{const f=e.target.files?.[0]; e.currentTarget.value=''; if(f)void uploadPdf(realIndex, r.id, f);}}/>
+                    </label>
+                    {r.downloadUrl
+                      ? <a href={r.downloadUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold text-indigo-500 hover:underline">Open PDF</a>
+                      : <span className="text-[10px] text-slate-400">PDF only · under 10MB</span>}
+                    <button type="button" onClick={()=>setEditing((p:any)=>({...p,resources:p.resources.filter((_:any,i:number)=>i!==realIndex)}))} className="ml-auto text-[11px] font-bold text-rose-500">Remove</button>
+                  </div>
                 </div>
               })}
               {!((editing.resources||[]).some((r:any)=>r.type==='pdf')) && <div className="p-5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-400">No PDFs added yet.</div>}
