@@ -624,7 +624,7 @@ export const AdminCoursesView: React.FC = () => {
                       <div className="flex items-center gap-3 mt-2">
                         <label className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer ${uploadingField===key?'bg-slate-300 text-slate-600 cursor-wait':'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
                           {uploadingField===key ? 'Uploading…' : 'Upload image'}
-                          <input type="file" accept="image/*" disabled={!!uploadingField} className="hidden" onChange={e=>{const f=e.target.files?.[0]; e.currentTarget.value=''; if(f)void uploadImage(key,f);}}/>
+                          <input type="file" accept="image/*" disabled={!!uploadingField} className="hidden" onChange={e=>{const input=e.currentTarget; const f=input.files?.[0]; if(f)void uploadImage(key,f).finally(()=>{input.value='';});}}/>
                         </label>
                         {editing[key] ? <img src={editing[key]} alt="" className="h-9 w-14 object-cover rounded-md border border-slate-200 dark:border-slate-700"/> : <span className="text-[10px] text-slate-400">JPG, PNG or WebP · under 3MB</span>}
                         {editing[key] && <button type="button" onClick={()=>setEditing({...editing,[key]:''})} className="text-[11px] font-bold text-rose-500">Remove</button>}
@@ -668,7 +668,7 @@ export const AdminCoursesView: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <label className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer ${uploadingField===`pdf-${r.id}`?'bg-slate-300 text-slate-600 cursor-wait':'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>
                       {uploadingField===`pdf-${r.id}` ? 'Uploading…' : 'Upload PDF'}
-                      <input type="file" accept="application/pdf" disabled={!!uploadingField} className="hidden" onChange={e=>{const f=e.target.files?.[0]; e.currentTarget.value=''; if(f)void uploadPdf(realIndex, r.id, f);}}/>
+                      <input type="file" accept="application/pdf" disabled={!!uploadingField} className="hidden" onChange={e=>{const input=e.currentTarget; const f=input.files?.[0]; if(f)void uploadPdf(realIndex, r.id, f).finally(()=>{input.value='';});}}/>
                     </label>
                     {r.downloadUrl
                       ? <a href={r.downloadUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold text-indigo-500 hover:underline">Open PDF</a>
