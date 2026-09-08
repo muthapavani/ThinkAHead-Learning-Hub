@@ -96,8 +96,55 @@ router.patch('/students/:id/access',async(req,res,next)=>{try{const months=Math.
 router.get('/students',async(req,res,next)=>{try{const q=(req.query.search||'').trim();const filter={role:'student',...(q?{$or:[{name:{$regex:q,$options:'i'}},{email:{$regex:q,$options:'i'}}]}:{})};const students=await User.find(filter).sort({createdAt:-1}).lean();res.json({success:true,students:students.map(userDto)})}catch(e){next(e)}});
 
 router.get('/courses',async(req,res,next)=>{try{res.json({success:true,courses:await Course.find().lean()})}catch(e){next(e)}});
-router.post('/courses',async(req,res,next)=>{try{if(!req.body.title)return res.status(400).json({success:false,message:'Course title is required.'});const slug=(req.body.slug||req.body.title).toLowerCase().trim().replace(/[^a-z0-9]+/g,'-');const c=await Course.create({...req.body,id:req.body.id||'course-'+Date.now(),slug});res.status(201).json({success:true,course:c})}catch(e){next(e)}});
-router.patch('/courses/:id',async(req,res,next)=>{try{const c=await Course.findOneAndUpdate({id:req.params.id},req.body,{new:true,runValidators:true});if(!c)return res.status(404).json({success:false,message:'Course not found.'});res.json({success:true,course:c})}catch(e){next(e)}});
+
+// The course form submits every field as a string, so empty number inputs
+// arrive as ''. Mongoose rejects those, which surfaced as "Validation failed".
+// Blank numerics are dropped and the rest are coerced before saving.
+const num=(v,fallback)=>{
+  // Number('') is 0, which would silently turn an empty box into a real value.
+  if(v===''||v===null||v===undefined||(typeof v==='string'&&v.trim()==='')) return fallback;
+  const n=Number(v);
+  return Number.isFinite(n)?n:fallback;
+};
+function normaliseCourse(body){
+  const c={...body};
+  for(const key of ['lessonsCount','monthUnlock','rating','reviewsCount']){
+    if(c[key]===''||c[key]===null||c[key]===undefined) delete c[key];
+    else c[key]=num(c[key],undefined);
+    if(c[key]===undefined) delete c[key];
+  }
+  if(typeof c.isFree!=='undefined') c.isFree=c.isFree===true||c.isFree==='true';
+  if(Array.isArray(c.modules)){
+    c.modules=c.modules.map(m=>({...m,lessons:(m.lessons||[]).map(l=>{
+      const lesson={...l};
+      for(const key of ['durationSeconds','order']){
+        if(lesson[key]===''||lesson[key]===null||lesson[key]===undefined) delete lesson[key];
+        else lesson[key]=num(lesson[key],undefined);
+        if(lesson[key]===undefined) delete lesson[key];
+      }
+      lesson.videoUrls=Array.isArray(lesson.videoUrls)?lesson.videoUrls.filter(Boolean):[];
+      return lesson;
+    })}));
+    // lessonsCount should follow the modules rather than be typed by hand.
+    c.lessonsCount=c.modules.reduce((t,m)=>t+(m.lessons||[]).length,0);
+  }
+  if(c.quiz&&Array.isArray(c.quiz.questions)){
+    c.quiz={...c.quiz,
+      durationMinutes:num(c.quiz.durationMinutes,undefined),
+      passingScorePercentage:num(c.quiz.passingScorePercentage,undefined),
+      questions:c.quiz.questions.map(q=>({...q,
+        options:Array.isArray(q.options)?q.options.filter(o=>String(o).trim()!==''):[],
+        correctAnswer:num(q.correctAnswer,0)
+      }))
+    };
+    if(c.quiz.durationMinutes===undefined) delete c.quiz.durationMinutes;
+    if(c.quiz.passingScorePercentage===undefined) delete c.quiz.passingScorePercentage;
+  }
+  return c;
+}
+
+router.post('/courses',async(req,res,next)=>{try{if(!req.body.title)return res.status(400).json({success:false,message:'Course title is required.'});const slug=(req.body.slug||req.body.title).toLowerCase().trim().replace(/[^a-z0-9]+/g,'-');const c=await Course.create({...normaliseCourse(req.body),id:req.body.id||'course-'+Date.now(),slug});res.status(201).json({success:true,course:c})}catch(e){next(e)}});
+router.patch('/courses/:id',async(req,res,next)=>{try{const c=await Course.findOneAndUpdate({id:req.params.id},normaliseCourse(req.body),{new:true,runValidators:true});if(!c)return res.status(404).json({success:false,message:'Course not found.'});res.json({success:true,course:c})}catch(e){next(e)}});
 
 router.get('/resources',async(req,res,next)=>{try{const courses=await Course.find().lean();const resources=courses.flatMap(c=>(c.resources||[]).map(r=>({...r,courseId:c.id,courseTitle:c.title})));res.json({success:true,resources})}catch(e){next(e)}});
 router.post('/courses/:courseId/resources',async(req,res,next)=>{try{const c=await Course.findOne({id:req.params.courseId});if(!c)return res.status(404).json({success:false,message:'Course not found.'});if(!req.body.title||!req.body.fileName)return res.status(400).json({success:false,message:'title and fileName are required.'});const resource={id:req.body.id||`res-${Date.now()}`,title:String(req.body.title).trim(),type:req.body.type||'pdf',fileName:String(req.body.fileName).trim(),fileSize:req.body.fileSize||'',category:req.body.category||'Handbook',downloadUrl:req.body.downloadUrl||'',contentSummary:req.body.contentSummary||'',published:req.body.published===true};c.resources.push(resource);await c.save();res.status(201).json({success:true,resource:c.resources[c.resources.length-1]})}catch(e){next(e)}});
