@@ -138,9 +138,24 @@ router.post('/progress/:courseId/assignments/:assignmentId',requireCourseAccess,
 router.post('/progress/:courseId/quiz',requireCourseAccess,async(req,res,next)=>{try{
  const course=req.course;
  const phase=req.body.phase==='starting'?'starting':'final';
- const answers=req.body.answers||{};let correct=0;for(const q of course.quiz.questions){if(Number(answers[q.id])===Number(q.correctAnswer))correct++}
- const total=course.quiz.questions.length,percentage=total?Math.round(correct/total*100):0,passed=percentage>=course.quiz.passingScorePercentage;
+ // Each phase has its own question set. The starting quiz falls back to the
+ // final one only if no separate starting quiz was configured.
+ const quiz=phase==='starting' ? (course.startingQuiz?.questions?.length ? course.startingQuiz : course.quiz) : course.quiz;
+ if(!quiz?.questions?.length) return res.status(400).json({success:false,message:'No questions have been added for this quiz yet.'});
+
  let p=await Progress.findOne({userId:req.user._id,courseId:course.id});if(!p)p=new Progress({userId:req.user._id,courseId:course.id});
+
+ if(phase==='final'){
+   // The final quiz only opens once every lesson has been watched.
+   const lessonIds=(course.modules||[]).flatMap(m=>(m.lessons||[]).map(l=>l.id));
+   const done=new Set(p.completedLessonIds||[]);
+   const pending=lessonIds.filter(id=>!done.has(id));
+   if(lessonIds.length && pending.length) return res.status(403).json({success:false,code:'LESSONS_PENDING',pending:pending.length,message:`Complete all ${lessonIds.length} lessons before taking the final quiz. ${pending.length} still pending.`});
+ }
+
+ const answers=req.body.answers||{};let correct=0;for(const q of quiz.questions){if(Number(answers[q.id])===Number(q.correctAnswer))correct++}
+ const passMark=Number(quiz.passingScorePercentage||70);
+ const total=quiz.questions.length,percentage=total?Math.round(correct/total*100):0,passed=percentage>=passMark;
  const result={score:correct,total,percentage,passed,takenAt:new Date().toISOString()};
 
  if(phase==='starting'){
