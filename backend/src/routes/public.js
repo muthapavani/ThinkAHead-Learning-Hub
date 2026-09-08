@@ -18,6 +18,11 @@ router.get('/media/:id', async (req,res,next)=>{
     res.set('Content-Type',media.mimeType||'image/jpeg');
     res.set('Cache-Control','public, max-age=31536000, immutable');
     res.set('Cross-Origin-Resource-Policy','cross-origin');
+    // PDFs open in the browser's viewer; ?download=1 saves the file instead.
+    if(media.mimeType==='application/pdf'){
+      const safe=String(media.name||'document.pdf').replace(/[^\w.\- ]+/g,'_');
+      res.set('Content-Disposition',`${req.query.download?'attachment':'inline'}; filename="${safe}"`);
+    }
     res.send(Buffer.from(media.data));
   } catch(e){next(e)}
 });
