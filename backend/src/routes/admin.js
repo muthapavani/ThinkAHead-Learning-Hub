@@ -31,11 +31,12 @@ const router=express.Router();router.use(requireAuth,requireVerifiedEmail,requir
 router.post('/uploads/pdf', pdfUpload.single('file'), async (req,res,next)=>{
   try {
     if(!req.file) return res.status(400).json({success:false,message:'Choose a PDF file under 10MB.'});
+    if(!req.file.buffer?.length) return res.status(400).json({success:false,message:'That file arrived empty. Please pick the PDF again.'});
     const media=await Media.create({
       data:req.file.buffer,
       mimeType:'application/pdf',
       name:req.file.originalname||'document.pdf',
-      size:req.file.size,
+      size:req.file.buffer.length,
       uploadedBy:req.user._id
     });
     const base=(process.env.PUBLIC_API_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,'');
@@ -53,11 +54,13 @@ router.post('/uploads/pdf', pdfUpload.single('file'), async (req,res,next)=>{
 router.post('/uploads/image', imageUpload.single('image'), async (req,res,next)=>{
   try {
     if(!req.file) return res.status(400).json({success:false,message:'Choose a JPG, PNG, WebP, GIF or AVIF image under 3MB.'});
+    // A zero-byte upload stores a blank record that later serves an empty image.
+    if(!req.file.buffer?.length) return res.status(400).json({success:false,message:'That file arrived empty. Please pick the image again.'});
     const media=await Media.create({
       data:req.file.buffer,
       mimeType:req.file.mimetype,
       name:req.file.originalname||'',
-      size:req.file.size,
+      size:req.file.buffer.length,
       uploadedBy:req.user._id
     });
     const base=(process.env.PUBLIC_API_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,'');
