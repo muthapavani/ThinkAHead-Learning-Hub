@@ -132,17 +132,20 @@ function normaliseCourse(body){
     // lessonsCount should follow the modules rather than be typed by hand.
     c.lessonsCount=c.modules.reduce((t,m)=>t+(m.lessons||[]).length,0);
   }
-  if(c.quiz&&Array.isArray(c.quiz.questions)){
-    c.quiz={...c.quiz,
-      durationMinutes:num(c.quiz.durationMinutes,undefined),
-      passingScorePercentage:num(c.quiz.passingScorePercentage,undefined),
-      questions:c.quiz.questions.map(q=>({...q,
-        options:Array.isArray(q.options)?q.options.filter(o=>String(o).trim()!==''):[],
-        correctAnswer:num(q.correctAnswer,0)
+  // Both quizzes share the same shape, so clean them the same way.
+  for(const key of ['quiz','startingQuiz']){
+    const q=c[key];
+    if(!q||!Array.isArray(q.questions)) continue;
+    c[key]={...q,
+      durationMinutes:num(q.durationMinutes,undefined),
+      passingScorePercentage:num(q.passingScorePercentage,undefined),
+      questions:q.questions.map(item=>({...item,
+        options:Array.isArray(item.options)?item.options.filter(o=>String(o).trim()!==''):[],
+        correctAnswer:num(item.correctAnswer,0)
       }))
     };
-    if(c.quiz.durationMinutes===undefined) delete c.quiz.durationMinutes;
-    if(c.quiz.passingScorePercentage===undefined) delete c.quiz.passingScorePercentage;
+    if(c[key].durationMinutes===undefined) delete c[key].durationMinutes;
+    if(c[key].passingScorePercentage===undefined) delete c[key].passingScorePercentage;
   }
   return c;
 }
