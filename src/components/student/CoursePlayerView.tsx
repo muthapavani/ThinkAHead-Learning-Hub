@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Play,
   Pause,
@@ -116,6 +116,52 @@ export const CoursePlayerView: React.FC = () => {
       duration: '12:45',
       videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
     };
+
+  const activeVideoUrl: string =
+    (activeLesson.videoUrls && activeLesson.videoUrls.length ? activeLesson.videoUrls[0] : activeLesson.videoUrl) || '';
+
+  // Hosted platforms have to be embedded in an iframe; a plain file can go
+  // straight into <video>. Anything unrecognised is treated as a file.
+  const embedUrl: string | null = useMemo(() => {
+    const raw = activeVideoUrl.trim();
+    if (!raw) return null;
+
+    let url: URL;
+    try { url = new URL(raw); } catch { return null; }
+    const host = url.hostname.replace(/^www\./, '');
+
+    // youtu.be/ID · youtube.com/watch?v=ID · /embed/ID · /shorts/ID · /live/ID
+    if (host === 'youtu.be' || host.endsWith('youtube.com') || host === 'youtube-nocookie.com') {
+      let id = '';
+      if (host === 'youtu.be') id = url.pathname.slice(1);
+      else if (url.searchParams.get('v')) id = url.searchParams.get('v') || '';
+      else {
+        const m = url.pathname.match(/\/(embed|shorts|live|v)\/([^/?#]+)/);
+        if (m) id = m[2];
+      }
+      id = id.split(/[/?#]/)[0];
+      if (!id) return null;
+      const params = new URLSearchParams({ rel: '0', modestbranding: '1', playsinline: '1' });
+      // Keep a ?t=90 or &start=90 deep link working.
+      const start = url.searchParams.get('start') || url.searchParams.get('t');
+      if (start) params.set('start', String(parseInt(start, 10) || 0));
+      return `https://www.youtube-nocookie.com/embed/${id}?${params.toString()}`;
+    }
+
+    if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+      const id = url.pathname.split('/').filter(Boolean).pop() || '';
+      return /^\d+$/.test(id) ? `https://player.vimeo.com/video/${id}` : null;
+    }
+
+    // Google Drive share links need the /preview form.
+    if (host === 'drive.google.com') {
+      const m = url.pathname.match(/\/file\/d\/([^/]+)/);
+      const id = m ? m[1] : url.searchParams.get('id');
+      return id ? `https://drive.google.com/file/d/${id}/preview` : null;
+    }
+
+    return null;
+  }, [activeVideoUrl]);
 
   const handleLessonNext = async () => {
     await markLessonComplete(currentCourse.id, activeLesson.id);
@@ -290,21 +336,35 @@ export const CoursePlayerView: React.FC = () => {
         <div className="lg:col-span-8 p-4 sm:p-6 space-y-6">
           {/* 1. Custom Interactive Video Player */}
           <div className="relative aspect-video rounded-3xl overflow-hidden bg-black border border-slate-800 shadow-2xl group flex flex-col justify-between">
-            {/* Admin-managed course video */}
-            <video
-              key={activeLesson.id}
-              className="absolute inset-0 w-full h-full object-cover"
-              src={(activeLesson.videoUrls && activeLesson.videoUrls.length ? activeLesson.videoUrls[0] : activeLesson.videoUrl) || ''}
-              poster={currentCourse.bannerImage || currentCourse.thumbnail}
-              controls
-              playsInline
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-            />
-            <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+            {/* Admin-managed course video. YouTube and Vimeo links are embedded,
+                direct files (MP4/WebM, e.g. from R2) use the native player. */}
+            {embedUrl ? (
+              <iframe
+                key={activeLesson.id}
+                className="absolute inset-0 w-full h-full"
+                src={embedUrl}
+                title={activeLesson.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+                frameBorder="0"
+              />
+            ) : (
+              <video
+                key={activeLesson.id}
+                className="absolute inset-0 w-full h-full object-cover"
+                src={activeVideoUrl}
+                poster={currentCourse.bannerImage || currentCourse.thumbnail}
+                controls
+                playsInline
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+              />
+            )}
+            {!embedUrl && <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/85 via-black/10 to-transparent" />}
 
             {/* Top Video Header */}
-            <div className="relative z-10 p-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
+            <div className="relative z-10 p-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded bg-indigo-600/80 text-white font-mono text-[10px] font-bold">
                   {activeModule.title}
@@ -315,7 +375,7 @@ export const CoursePlayerView: React.FC = () => {
               </div>
               <span className="text-xs font-mono text-slate-400">{activeLesson.duration}</span>
             </div>
-            <div className="relative z-10 px-4 pb-4 mt-auto pointer-events-none">
+            {!embedUrl && <div className="relative z-10 px-4 pb-4 mt-auto pointer-events-none">
               <div className="max-w-xl rounded-2xl border border-white/15 bg-slate-950/75 backdrop-blur-xl p-3 shadow-2xl">
                 <div className="flex items-center gap-3">
                   <img src={currentCourse.thumbnail} alt="" className="w-14 h-10 rounded-lg object-cover border border-white/10" />
@@ -327,11 +387,11 @@ export const CoursePlayerView: React.FC = () => {
                   <span className="ml-auto shrink-0 px-2 py-1 rounded-lg bg-white/10 text-[9px] font-bold text-white border border-white/10">{currentCourse.lessonsCount} Lessons</span>
                 </div>
               </div>
-            </div>
+            </div>}
 
-            <div className="absolute left-4 bottom-4 z-10 px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-semibold text-white pointer-events-none">
+            {!embedUrl && <div className="absolute left-4 bottom-4 z-10 px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-semibold text-white pointer-events-none">
               {isPlaying ? 'Now Playing' : 'Ready to Play'} • {activeLesson.duration}
-            </div>
+            </div>}
           </div>
 
           {/* Lesson Action Bar */}
