@@ -14,7 +14,9 @@ router.get('/media/:id', async (req,res,next)=>{
   try {
     if(!/^[0-9a-fA-F]{24}$/.test(req.params.id)) return res.status(404).end();
     const media=await Media.findById(req.params.id).lean();
-    if(!media?.data) return res.status(404).end();
+    // An empty Buffer is still truthy, so check the length or a blank record
+    // would be served as a valid but invisible image.
+    if(!media?.data?.length) return res.status(404).end();
     res.set('Content-Type',media.mimeType||'image/jpeg');
     res.set('Cache-Control','public, max-age=31536000, immutable');
     res.set('Cross-Origin-Resource-Policy','cross-origin');
