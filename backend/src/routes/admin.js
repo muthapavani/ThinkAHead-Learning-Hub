@@ -6,8 +6,35 @@ const Certificate=require('../models/Certificate');
 const Payment=require('../models/Payment');
 const Notification=require('../models/Notification');
 const Achievement=require('../models/Achievement');
+const multer=require('multer');
+const Media=require('../models/Media');
 const {requireAuth,requireRole,requireVerifiedEmail}=require('../middleware/auth');
+// Images are held in memory only long enough to store them; nothing touches disk,
+// which matters on hosts with an ephemeral filesystem.
+const imageUpload=multer({
+  storage:multer.memoryStorage(),
+  limits:{fileSize:3*1024*1024},
+  fileFilter:(req,file,cb)=>cb(null,/^image\/(jpeg|png|webp|gif|avif)$/.test(file.mimetype))
+});
 const router=express.Router();router.use(requireAuth,requireVerifiedEmail,requireRole('admin'));
+
+// Upload an image and get back a public URL to paste into a course field.
+// Returns an absolute URL so it resolves from the frontend's own domain.
+router.post('/uploads/image', imageUpload.single('image'), async (req,res,next)=>{
+  try {
+    if(!req.file) return res.status(400).json({success:false,message:'Choose a JPG, PNG, WebP, GIF or AVIF image under 3MB.'});
+    const media=await Media.create({
+      data:req.file.buffer,
+      mimeType:req.file.mimetype,
+      name:req.file.originalname||'',
+      size:req.file.size,
+      uploadedBy:req.user._id
+    });
+    const base=(process.env.PUBLIC_API_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,'');
+    res.status(201).json({success:true,url:`${base}/api/public/media/${media._id}`,id:media._id});
+  } catch(e){next(e)}
+});
+
 
 const userDto=u=>({id:u._id.toString(),name:u.name,email:u.email,phone:u.phone||'',role:u.role,avatar:u.profilePhoto?.length ? `data:${u.profilePhotoMimeType||'image/jpeg'};base64,${Buffer.from(u.profilePhoto).toString('base64')}` : '',bio:u.bio||'',enrolledCourseIds:u.enrolledCourseIds||[],completedCourseIds:u.completedCourseIds||[],subscription:u.subscription,streakDays:u.streakDays||0,totalHours:u.totalHours||0,points:u.points||0,unlockedBadgeIds:u.unlockedBadgeIds||[]});
 
