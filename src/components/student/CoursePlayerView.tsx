@@ -14,6 +14,7 @@ import {
   Award,
   ArrowLeft,
   ListChecks,
+  ClipboardCheck,
   ChevronDown,
   ChevronRight,
   BookOpen,
@@ -74,7 +75,7 @@ export const CoursePlayerView: React.FC = () => {
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [showCompletionCelebration, setShowCompletionCelebration] = useState(false);
   const [activeLessonIndex, setActiveLessonIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'resources' | 'curriculum'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'resources' | 'curriculum' | 'quizzes'>('overview');
 
   // Video player state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -179,12 +180,15 @@ export const CoursePlayerView: React.FC = () => {
     }
 
     setShowCompletionCelebration(false);
-    showToast('All lessons completed. Your Final Quiz is now available below the curriculum.');
-    setActiveTab('overview');
+    showToast('All lessons completed. Your Final Quiz is now unlocked in the Quizzes tab.');
+    setActiveTab('quizzes');
   };
 
   const handleQuizSubmit = async (phase: 'starting' | 'final') => {
-    const questions = currentCourse.quiz?.questions || (currentCourse as any).quizQuestions || [];
+    const source: any = phase === 'starting'
+      ? ((currentCourse as any).startingQuiz?.questions?.length ? (currentCourse as any).startingQuiz : (currentCourse as any).quiz)
+      : (currentCourse as any).quiz;
+    const questions = source?.questions || [];
     if (!questions.length) return;
     const answers = phase === 'starting' ? startingQuizAnswers : finalQuizAnswers;
     const result = await submitQuiz(currentCourse.id, answers, phase);
@@ -216,8 +220,13 @@ export const CoursePlayerView: React.FC = () => {
     submitted: boolean,
     score: number | null
   ) => {
-    const questions = currentCourse.quiz?.questions || [];
     const isFinal = phase === 'final';
+    // Each phase has its own question set; the starting quiz falls back to the
+    // final one only when no separate starting quiz was configured.
+    const quizData: any = isFinal
+      ? (currentCourse as any).quiz
+      : ((currentCourse as any).startingQuiz?.questions?.length ? (currentCourse as any).startingQuiz : (currentCourse as any).quiz);
+    const questions = quizData?.questions || [];
     return (
       <div className={`p-5 sm:p-6 rounded-3xl border space-y-5 ${theme === 'dark' ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
@@ -432,6 +441,7 @@ export const CoursePlayerView: React.FC = () => {
                 { id: 'notes', label: 'Interactive Notes', icon: <FileText className="w-3.5 h-3.5" /> },
                 { id: 'resources', label: 'Handbooks & PDFs', icon: <Download className="w-3.5 h-3.5" /> },
                 { id: 'curriculum', label: 'Course Curriculum', icon: <ListChecks className="w-3.5 h-3.5" /> },
+                { id: 'quizzes', label: 'Quizzes', icon: <ClipboardCheck className="w-3.5 h-3.5" /> },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -482,6 +492,14 @@ export const CoursePlayerView: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+              </div>
+            )}
+
+
+            {/* TAB CONTENT: QUIZZES */}
+            {activeTab === 'quizzes' && (
+              <div className="space-y-5">
               <div className="pt-1">
                 {renderQuizSection('starting', startingQuizAnswers, setStartingQuizAnswers, startingQuizSubmitted, startingQuizScore)}
               </div>
@@ -508,6 +526,13 @@ export const CoursePlayerView: React.FC = () => {
                 </div>
               )}
 
+                {!allLessonsCompleted && !finalQuizSubmitted && (
+                  <div className={`p-5 rounded-3xl border border-dashed text-center ${theme === 'dark' ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-500'}`}>
+                    <Lock className="w-5 h-5 mx-auto mb-2 opacity-60" />
+                    <div className="text-xs font-bold">Final quiz is locked</div>
+                    <p className="text-[11px] mt-1">Finish every lesson in the curriculum to unlock it.</p>
+                  </div>
+                )}
               </div>
             )}
 
