@@ -48,6 +48,15 @@ const courseSchema = new mongoose.Schema({
     id: String, title: String, dueDate: String, points: Number, description: String,
     guidelines: [String]
   }],
+  // Taken before any lesson, purely to gauge the learner's starting level.
+  // It is never gated and never affects completion.
+  startingQuiz: {
+    id: String, title: String, durationMinutes: Number, passingScorePercentage: Number,
+    questions: [{
+      id: String, question: String, options: [String], correctAnswer: Number, explanation: String
+    }]
+  },
+  // The final quiz. Passing it completes the course and earns the certificate.
   quiz: {
     id: String, title: String, durationMinutes: Number, passingScorePercentage: Number,
     questions: [{
