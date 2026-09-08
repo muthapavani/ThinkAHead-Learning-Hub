@@ -16,10 +16,39 @@ const imageUpload=multer({
   limits:{fileSize:3*1024*1024},
   fileFilter:(req,file,cb)=>cb(null,/^image\/(jpeg|png|webp|gif|avif)$/.test(file.mimetype))
 });
+// PDFs are course handouts, so they get more room than an image but are still
+// capped - anything larger belongs on a file host, not in the database.
+const pdfUpload=multer({
+  storage:multer.memoryStorage(),
+  limits:{fileSize:10*1024*1024},
+  fileFilter:(req,file,cb)=>cb(null,file.mimetype==='application/pdf')
+});
 const router=express.Router();router.use(requireAuth,requireVerifiedEmail,requireRole('admin'));
 
 // Upload an image and get back a public URL to paste into a course field.
 // Returns an absolute URL so it resolves from the frontend's own domain.
+// Upload a PDF handout and get back a public URL for the resource record.
+router.post('/uploads/pdf', pdfUpload.single('file'), async (req,res,next)=>{
+  try {
+    if(!req.file) return res.status(400).json({success:false,message:'Choose a PDF file under 10MB.'});
+    const media=await Media.create({
+      data:req.file.buffer,
+      mimeType:'application/pdf',
+      name:req.file.originalname||'document.pdf',
+      size:req.file.size,
+      uploadedBy:req.user._id
+    });
+    const base=(process.env.PUBLIC_API_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,'');
+    res.status(201).json({
+      success:true,
+      url:`${base}/api/public/media/${media._id}`,
+      id:media._id,
+      fileName:media.name,
+      fileSize:`${(media.size/1048576).toFixed(1)} MB`
+    });
+  } catch(e){next(e)}
+});
+
 router.post('/uploads/image', imageUpload.single('image'), async (req,res,next)=>{
   try {
     if(!req.file) return res.status(400).json({success:false,message:'Choose a JPG, PNG, WebP, GIF or AVIF image under 3MB.'});
