@@ -197,11 +197,9 @@ export const MyLearningView: React.FC = () => {
                       <button
                         onClick={() => { setSelectedCourseId(course.id); setCurrentView('student-player'); }}
                         className={`flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-colors ${
-                          started && !isCompleted
-                            ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                            : theme === 'dark'
-                            ? 'bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700'
-                            : 'bg-slate-900 hover:bg-slate-800 text-white'
+                          isCompleted
+                            ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white hover:from-emerald-500 hover:to-teal-400 shadow-md shadow-emerald-600/20'
+                            : 'bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 text-white hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 shadow-md shadow-indigo-600/20'
                         }`}
                       >
                         {isCompleted ? 'Review course' : started ? 'Continue' : 'Start course'}
@@ -288,11 +286,10 @@ export const CertificatesView: React.FC = () => {
           <h1 className="mt-3 text-2xl sm:text-3xl font-black tracking-tight">My Certificate</h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Complete every course, then take the final assessment to unlock your certificate for the complete ThinkAHead learning program.</p>
         </div>
-        <button onClick={() => setCurrentView('student-my-learning')} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500 text-white text-xs font-bold shadow-lg">Continue Learning</button>
       </div>
 
       {/* Final assessment: the last step before the certificate is issued. */}
-      {assessment?.available && (
+      {assessment && (
         <div className={`rounded-3xl border p-5 sm:p-6 space-y-4 ${theme === 'dark' ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
@@ -309,7 +306,15 @@ export const CertificatesView: React.FC = () => {
             )}
           </div>
 
-          {!assessment.unlocked && (
+          {!assessment.available && (
+            <div className={`p-4 rounded-2xl border border-dashed text-center ${theme === 'dark' ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-500'}`}>
+              <Lock className="w-5 h-5 mx-auto mb-2 opacity-60" />
+              <div className="text-xs font-bold">Not open yet</div>
+              <p className="text-[11px] mt-1">Your final assessment will appear here once it is published.</p>
+            </div>
+          )}
+
+          {assessment.available && !assessment.unlocked && (
             <div className={`p-4 rounded-2xl border border-dashed text-center ${theme === 'dark' ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-500'}`}>
               <Lock className="w-5 h-5 mx-auto mb-2 opacity-60" />
               <div className="text-xs font-bold">Locked</div>
@@ -317,13 +322,13 @@ export const CertificatesView: React.FC = () => {
             </div>
           )}
 
-          {assessment.unlocked && assessment.attemptsLeft <= 0 && (
+          {assessment.available && assessment.unlocked && assessment.attemptsLeft <= 0 && (
             <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300">
               All {assessment.maxAttempts} attempts used. Your recorded score is {assessment.bestPercentage}%, and it appears on your certificate.
             </div>
           )}
 
-          {assessment.unlocked && assessment.attemptsLeft > 0 && !taking && (
+          {assessment.available && assessment.unlocked && assessment.attemptsLeft > 0 && !taking && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {assessment.attemptsUsed > 0
@@ -904,8 +909,8 @@ export const NotificationsView: React.FC = () => {
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-5xl mx-auto">
       <div>
-        <button onClick={() => setCurrentView('student-settings')} className="inline-flex items-center gap-1.5 mb-4 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
-          <ArrowLeft className="w-4 h-4" /> Back to Settings
+        <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+          <ArrowLeft className="w-4 h-4" /> Back to Learning
         </button>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 dark:text-blue-400 text-xs font-bold mb-2">
           <Bell className="w-3.5 h-3.5" /><span>Account Updates</span>
@@ -959,8 +964,8 @@ export const ProgressView: React.FC = () => {
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-7xl mx-auto">
       <div>
-        <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 mb-4 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
-          <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+        <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+          <ArrowLeft className="w-4 h-4" /> Back to Learning
         </button>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-500 text-xs font-bold mb-2">
           <TrendingUp className="w-3.5 h-3.5" />
@@ -1012,7 +1017,7 @@ export const ProgressView: React.FC = () => {
                   </div>
                   <div className="text-[10px] text-slate-500 mt-1">{done ? 'Completed' : percent > 0 ? 'In Progress' : 'Not Started'} • {p?.completedLessonIds?.length || 0}/{course.lessonsCount} lessons completed</div>
                 </div>
-                <button onClick={() => { setSelectedCourseId(course.id); setCurrentView('student-player'); }} className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shrink-0">
+                <button onClick={() => { setSelectedCourseId(course.id); setCurrentView('student-player'); }} className={`px-4 py-2 rounded-xl text-white text-xs font-bold shrink-0 shadow-md ${done ? 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 shadow-emerald-600/20' : 'bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 shadow-indigo-600/20'}`}>
                   {done ? 'Review' : 'Continue'}
                 </button>
               </div>
@@ -1076,8 +1081,9 @@ export const ProfileView: React.FC = () => {
 
   return (
     <div className="min-h-full px-4 py-6 sm:px-8 sm:py-8">
-      <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
-        <ArrowLeft className="w-4 h-4" /> Back to Learning
+      {/* Admins land here too, so send them back where they came from. */}
+      <button onClick={() => setCurrentView(isAdmin ? 'admin-dashboard' : 'student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+        <ArrowLeft className="w-4 h-4" /> {isAdmin ? 'Back to Overview' : 'Back to Learning'}
       </button>
       <div className="max-w-5xl mx-auto">
         {/* Profile hero — centered like a polished real-world account page */}
@@ -1216,8 +1222,8 @@ export const SettingsView: React.FC = () => {
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-4xl mx-auto">
       <div>
-        <button onClick={() => setCurrentView('student-profile')} className="inline-flex items-center gap-1.5 mb-4 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
-          <ArrowLeft className="w-4 h-4" /> Back to Profile
+        <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+          <ArrowLeft className="w-4 h-4" /> Back to Learning
         </button>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-bold mb-2">
           <Settings className="w-3.5 h-3.5" />
