@@ -244,13 +244,7 @@ export default function App() {
       <div className="flex-1 min-w-0 flex flex-col h-screen overflow-y-auto">
         <StudentHeader onMenuClick={() => setStudentSidebarOpen(prev => !prev)} sidebarOpen={studentSidebarOpen} />
         <main className="flex-1">
-          {currentView !== 'student-dashboard' && (
-            <div className="hidden sm:flex max-w-7xl mx-auto px-4 sm:px-6 md:px-8 pt-4 md:pt-5">
-              <button type="button" onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/70 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:border-cyan-400 transition-colors" aria-label="Back to Student Dashboard">
-                <span aria-hidden="true">←</span> Back to Learning
-              </button>
-            </div>
-          )}
+          {/* Each student view renders its own Back to Learning button. */}
           {currentView === 'student-dashboard' && <StudentDashboardView />}
           {currentView === 'student-my-learning' && <MyLearningView />}
           {currentView === 'student-all-courses' && <AllCoursesView />}

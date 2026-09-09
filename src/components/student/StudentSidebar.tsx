@@ -175,3 +175,4 @@ export const StudentSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> 
     </>
   );
 };
+

@@ -146,9 +146,13 @@ export const AdminHeader: React.FC<{ title?: string; onMenuClick?: () => void; s
             aria-label="Open profile menu"
             title="Open profile menu"
           >
-            {/* Initials rather than a photo: admins manage their own image. */}
-            <span className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-1 ring-slate-300/40 dark:ring-slate-700 hover:ring-cyan-400/70 transition-all bg-gradient-to-br from-indigo-600 to-cyan-500 text-white flex items-center justify-center text-xs font-black">
-              {(currentUser?.name || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+            {/* The admin's own uploaded photo. Initials show only until one is set. */}
+            <span className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-1 ring-slate-300/40 dark:ring-slate-700 hover:ring-cyan-400/70 transition-all">
+              {currentUser?.avatar
+                ? <img src={currentUser.avatar} alt={currentUser?.name || 'Profile'} className="w-full h-full rounded-full object-cover" />
+                : <span className="w-full h-full rounded-full bg-gradient-to-br from-indigo-600 to-cyan-500 text-white flex items-center justify-center text-xs font-black">
+                    {(currentUser?.name || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </span>}
             </span>
           </button>
 
