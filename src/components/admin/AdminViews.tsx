@@ -1219,6 +1219,45 @@ export const AdminAnalyticsView: React.FC = () => {
 export const AdminSettingsView: React.FC = () => {
   const { theme, showToast } = useApp();
 
+  // The programme-wide final assessment lives here rather than inside a course,
+  // because it is taken once, after every course is finished.
+  const [mq, setMq] = useState<any>(null);
+  const [savingMq, setSavingMq] = useState(false);
+
+  useEffect(() => {
+    void api<any>('/admin/master-quiz')
+      .then(r => setMq(r.masterQuiz))
+      .catch(e => showToast(e.message || 'Unable to load the final assessment.'));
+  }, []);
+
+  const setMqField = (field: string, value: any) => setMq((p: any) => ({ ...p, [field]: value }));
+  const setMqQuestion = (qi: number, field: string, value: any) =>
+    setMq((p: any) => ({ ...p, questions: p.questions.map((q: any, i: number) => i === qi ? { ...q, [field]: value } : q) }));
+  const setMqOption = (qi: number, oi: number, value: string) =>
+    setMq((p: any) => ({ ...p, questions: p.questions.map((q: any, i: number) => {
+      if (i !== qi) return q;
+      const options = [...(q.options || ['', '', '', ''])];
+      options[oi] = value;
+      return { ...q, options };
+    }) }));
+  const addMqQuestion = () =>
+    setMq((p: any) => ({ ...p, questions: [...(p.questions || []), { id: `mq-${Date.now()}`, question: '', options: ['', '', '', ''], correctAnswer: 0, explanation: '' }] }));
+  const removeMqQuestion = (qi: number) =>
+    setMq((p: any) => ({ ...p, questions: p.questions.filter((_: any, i: number) => i !== qi) }));
+
+  const saveMasterQuiz = async () => {
+    setSavingMq(true);
+    try {
+      const r = await api<any>('/admin/master-quiz', { method: 'PUT', body: JSON.stringify(mq) });
+      setMq(r.masterQuiz);
+      showToast(r.message || 'Final assessment saved.');
+    } catch (e: any) {
+      showToast(e.message || 'Unable to save the final assessment.');
+    } finally {
+      setSavingMq(false);
+    }
+  };
+
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-4xl mx-auto">
       <div>
@@ -1249,6 +1288,60 @@ export const AdminSettingsView: React.FC = () => {
               />
             </div>
           </div>
+        </div>
+
+        <div className="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Final Assessment</h3>
+              <p className="text-[11px] text-slate-400 mt-1">Taken once, after every course is complete. Finishing it issues the certificate, and the score is printed on it. There is no pass mark.</p>
+            </div>
+            {mq && (
+              <label className="flex items-center gap-2 text-xs font-bold shrink-0">
+                <input type="checkbox" checked={!!mq.published} onChange={e => setMqField('published', e.target.checked)} />
+                <span>{mq.published ? 'Published' : 'Draft'}</span>
+              </label>
+            )}
+          </div>
+
+          {!mq ? <div className="text-xs text-slate-400">Loading final assessment…</div> : <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <label className="sm:col-span-3"><span className="block text-[11px] font-bold text-slate-500 mb-1">Title</span>
+                <input value={mq.title || ''} onChange={e => setMqField('title', e.target.value)} className="w-full px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm" /></label>
+              <label><span className="block text-[11px] font-bold text-slate-500 mb-1">Max attempts</span>
+                <input type="number" min="1" max="10" value={mq.maxAttempts ?? 3} onChange={e => setMqField('maxAttempts', Number(e.target.value))} className="w-full px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm" /></label>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500">{(mq.questions || []).length} question(s)</span>
+              <button type="button" onClick={addMqQuestion} className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"><Plus className="w-3.5 h-3.5 inline mr-1" /> Add Question</button>
+            </div>
+
+            {(mq.questions || []).map((q: any, qi: number) => (
+              <div key={q.id || qi} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+                <input value={q.question || ''} onChange={e => setMqQuestion(qi, 'question', e.target.value)} placeholder={`Question ${qi + 1}`} className="w-full px-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-xs font-bold" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {(q.options || ['', '', '', '']).map((o: string, oi: number) => (
+                    <input key={oi} value={o} onChange={e => setMqOption(qi, oi, e.target.value)} placeholder={`Option ${oi + 1}`} className="px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-xs" />
+                  ))}
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-[10px] font-bold text-slate-500">Correct option
+                    <select value={q.correctAnswer ?? 0} onChange={e => setMqQuestion(qi, 'correctAnswer', Number(e.target.value))} className="ml-2 px-2 py-1 rounded-lg border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+                      <option value={0}>1</option><option value={1}>2</option><option value={2}>3</option><option value={3}>4</option>
+                    </select>
+                  </label>
+                  <button type="button" onClick={() => removeMqQuestion(qi)} className="text-[11px] font-bold text-rose-500">Remove</button>
+                </div>
+              </div>
+            ))}
+
+            {!(mq.questions || []).length && <div className="p-5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-400">No questions yet. The assessment cannot be published until at least one is added.</div>}
+
+            <div className="flex justify-end">
+              <button type="button" disabled={savingMq} onClick={() => void saveMasterQuiz()} className="px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-500 shadow-md disabled:opacity-60">{savingMq ? 'Saving…' : 'Save Final Assessment'}</button>
+            </div>
+          </>}
         </div>
 
         <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">

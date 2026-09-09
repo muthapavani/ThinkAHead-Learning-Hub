@@ -173,8 +173,17 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
               <div className="text-sm sm:text-xl font-bold text-slate-900 mt-1 sm:mt-2 text-indigo-900 font-serif">
                 {certificate.courseName}
               </div>
-              <div className="mt-2 inline-flex flex-wrap items-center justify-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[8px] sm:text-[9px] font-bold text-emerald-700">
-                Final Assessment Average: {certificate.overallAssessmentScore || 0}%
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+                {/* Score from the programme-wide final assessment sits first, since
+                    passing it is what earns the certificate. */}
+                {(certificate as any).finalAssessmentScore ? (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-[8px] sm:text-[9px] font-bold text-indigo-800">
+                    Final Assessment: {(certificate as any).finalAssessmentScore}%
+                  </div>
+                ) : null}
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[8px] sm:text-[9px] font-bold text-emerald-700">
+                  Course Average: {certificate.overallAssessmentScore || 0}%
+                </div>
               </div>
               {certificate.assessmentScores?.length ? (
                 <div className="mt-2 max-w-2xl mx-auto text-[7px] sm:text-[8px] text-slate-500 leading-relaxed">

@@ -75,6 +75,7 @@ export const CoursePlayerView: React.FC = () => {
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [showCompletionCelebration, setShowCompletionCelebration] = useState(false);
   const [activeLessonIndex, setActiveLessonIndex] = useState(0);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'resources' | 'curriculum' | 'quizzes'>('overview');
 
   // Video player state
@@ -164,6 +165,47 @@ export const CoursePlayerView: React.FC = () => {
 
     return null;
   }, [activeVideoUrl]);
+
+  // Marks the lesson watched without moving on. Used by the video's own end
+  // event and by the checkbox in the curriculum list, since the old
+  // "Mark Complete & Next" button was removed.
+  const completeLesson = async (courseId: string, lessonId: string, title: string) => {
+    if (progress?.completedLessonIds?.includes(lessonId)) return;
+    await markLessonComplete(courseId, lessonId);
+    showToast(`Lesson completed: ${title}`);
+  };
+
+  // The download attribute is ignored for cross-origin links, so the browser
+  // just opens the PDF in a new tab. Fetching the bytes and saving them from a
+  // blob URL keeps it a real download.
+  const downloadResource = async (res: any) => {
+    setDownloadingId(res.id);
+    try {
+      const url = `${res.downloadUrl}${res.downloadUrl.includes('?') ? '&' : '?'}download=1`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Server returned ${response.status}`);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = res.fileName || `${res.title || 'resource'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      showToast(`Downloaded: ${res.title}`);
+    } catch (e: any) {
+      showToast(e?.message ? `Could not download that file: ${e.message}` : 'Could not download that file.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const toggleLessonComplete = async (lessonId: string, title: string, isComplete: boolean) => {
+    if (isComplete) { showToast('This lesson is already marked as watched.'); return; }
+    await markLessonComplete(currentCourse.id, lessonId);
+    showToast(`Lesson completed: ${title}`);
+  };
 
   const handleLessonNext = async () => {
     await markLessonComplete(currentCourse.id, activeLesson.id);
@@ -368,6 +410,7 @@ export const CoursePlayerView: React.FC = () => {
                 controls
                 playsInline
                 onPlay={() => setIsPlaying(true)}
+              onEnded={() => { setIsPlaying(false); void completeLesson(currentCourse.id, activeLesson.id, activeLesson.title); }}
                 onPause={() => setIsPlaying(false)}
               />
             )}
@@ -586,21 +629,16 @@ export const CoursePlayerView: React.FC = () => {
                           <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-mono">{res.type} • {res.size}</span>
                         </div>
                       </div>
-                      {/* A real link, so the browser actually saves the file.
-                          download=1 makes the API send Content-Disposition:
-                          attachment instead of opening it in the PDF viewer. */}
                       {res.downloadUrl ? (
-                        <a
-                          href={`${res.downloadUrl}${res.downloadUrl.includes('?') ? '&' : '?'}download=1`}
-                          download={res.fileName || `${res.title}.pdf`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => showToast(`Downloading: ${res.title}`)}
-                          className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-blue-600 hover:text-white dark:bg-slate-700 dark:hover:bg-blue-600 text-slate-700 dark:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                        <button
+                          type="button"
+                          disabled={downloadingId === res.id}
+                          onClick={() => void downloadResource(res)}
+                          className="px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-blue-600 hover:text-white dark:bg-slate-700 dark:hover:bg-blue-600 text-slate-700 dark:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-60"
                         >
                           <Download className="w-3.5 h-3.5" />
-                          <span>Download</span>
-                        </a>
+                          <span>{downloadingId === res.id ? 'Downloading…' : 'Download'}</span>
+                        </button>
                       ) : (
                         <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 text-xs font-semibold">Not uploaded</span>
                       )}
@@ -649,34 +687,43 @@ export const CoursePlayerView: React.FC = () => {
                       const isSelected = activeLessonIndex === lesIdx;
 
                       return (
-                        <button
+                        <div
                           key={les.id}
-                          onClick={() => {
-                            setActiveLessonIndex(lesIdx);
-                            setIsPlaying(true);
-                          }}
-                          className={`w-full p-2.5 rounded-xl text-left flex items-center justify-between text-xs transition-all ${
+                          className={`w-full p-2.5 rounded-xl flex items-center justify-between gap-2 text-xs transition-all ${
                             isSelected
                               ? 'bg-indigo-600 text-white font-bold shadow-sm'
                               : isComplete
-                              ? 'bg-slate-50 text-slate-600 hover:bg-slate-100 dark:bg-slate-800/30 dark:text-slate-300 dark:hover:bg-slate-800'
-                              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
+                              ? 'bg-slate-50 text-slate-600 dark:bg-slate-800/30 dark:text-slate-300'
+                              : 'text-slate-500 dark:text-slate-400'
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            {isComplete ? (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
-                            ) : isSelected ? (
-                              <Play className="w-3.5 h-3.5 text-white shrink-0 fill-white" />
-                            ) : (
-                              <Circle className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
-                            )}
+                          {/* The tick is its own control. A YouTube embed cannot
+                              report that a video finished, so the learner marks
+                              the lesson watched from here. */}
+                          <button
+                            type="button"
+                            title={isComplete ? 'Already watched' : 'Mark as watched'}
+                            onClick={() => void toggleLessonComplete(les.id, les.title, !!isComplete)}
+                            className="shrink-0"
+                          >
+                            {isComplete
+                              ? <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                              : <Circle className={`w-4 h-4 hover:text-emerald-500 ${isSelected ? 'text-white/80' : 'text-slate-400 dark:text-slate-500'}`} />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => { setActiveLessonIndex(lesIdx); setIsPlaying(true); }}
+                            className="flex items-center gap-2 min-w-0 flex-1 text-left"
+                          >
+                            {isSelected && <Play className="w-3.5 h-3.5 text-white shrink-0 fill-white" />}
                             <span className="truncate">{les.title}</span>
-                          </div>
+                          </button>
+
                           <span className={`text-[10px] font-mono shrink-0 pl-2 ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>
                             {les.duration}
                           </span>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>

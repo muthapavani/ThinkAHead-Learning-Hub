@@ -47,6 +47,7 @@ interface AppContextType {
   completeCourse: (courseId: string) => Promise<void>;
   enrollInCourse: (courseId: string) => Promise<void>;
 
+  refreshStudentData: () => Promise<void>;
   completedCoursesCount: number; totalCoursesCount: number; enrolledCoursesCount: number; overallProgressPercent: number; masterCertificate: CertificateRecord | null;
   completeAllCoursesForDemo: () => Promise<void>; openMasterCertificate: () => Promise<void>;
   certificates: CertificateRecord[]; activeCertificate: CertificateRecord | null; setActiveCertificate: (cert: CertificateRecord | null) => void;
@@ -297,6 +298,12 @@ export const AppProvider: React.FC<{children:React.ReactNode}> = ({children}) =>
     : 0;
   const totalCoursesCount=courses.length;
 
+  // Re-pulls the learner's data. Used after the final assessment so the freshly
+  // issued certificate shows up without a page reload.
+  const refreshStudentData=async()=>{
+    try{ const boot=await api<any>('/student/bootstrap'); applyBootstrap(boot.data); }catch{}
+  };
+
   const login=async(email:string,password='')=>{
     try{const r=await api<any>('/auth/login',{method:'POST',body:JSON.stringify({email:email.trim(),password:password.trim()})});if(r.requiresEmailVerification){clearToken();setCurrentUser(null);localStorage.setItem('tah_verify_email',r.email||email.trim().toLowerCase());localStorage.setItem('tah_verify_purpose','registration');localStorage.setItem('tah_verify_started',String(Date.now()));if(r.pendingToken)localStorage.setItem('tah_pending_token',r.pendingToken);setCurrentView('auth-verify');showToast(r.message||'Please verify your email address to continue.');return {success:true,role:'student' as UserRole,message:'Please verify your email.'};}setToken(r.token);setCurrentUser(r.user);setCurrentView(r.user.role==='admin'?'admin-dashboard':'student-dashboard');const boot=r.user.role==='student'?await api<any>('/student/bootstrap'):null;if(boot)applyBootstrap(boot.data);if(r.user.role==='admin'){const [p,c]=await Promise.all([api<any>('/admin/payments'),api<any>('/admin/certificates')]);setPayments(p.payments);setCertificates(c.certificates.map(toCertificate))}showToast(`Welcome back, ${r.user.name}!`);return {success:true,role:r.user.role as UserRole}}catch(e:any){showToast(e.message||'Unable to log in.');return {success:false,message:e.message}}};
 
@@ -411,7 +418,7 @@ export const AppProvider: React.FC<{children:React.ReactNode}> = ({children}) =>
     theme,setTheme,toggleTheme,currentView,setCurrentView,searchQuery,setSearchQuery,currentUser,setCurrentUser,switchToRole,login,register,logout,confirmLogout,cancelLogout,logoutConfirmOpen,updateProfile,uploadProfilePhoto,updateSettings,signInWithGoogle,requestPasswordReset,verifyPasswordResetOtp,resendPasswordResetOtp,completeVerifiedSession,resetPassword,resendVerificationEmail,
     courses,selectedCourseId,setSelectedCourseId,activeCourse,isCourseUnlocked,subscriptionUnlockedMonths,
     progressMap,markLessonComplete,saveLessonNote,submitAssignment,submitQuiz,completeCourse,enrollInCourse,
-    completedCoursesCount,totalCoursesCount,enrolledCoursesCount,overallProgressPercent,masterCertificate,completeAllCoursesForDemo,openMasterCertificate,certificates,activeCertificate,setActiveCertificate,
+    refreshStudentData,completedCoursesCount,totalCoursesCount,enrolledCoursesCount,overallProgressPercent,masterCertificate,completeAllCoursesForDemo,openMasterCertificate,certificates,activeCertificate,setActiveCertificate,
     viewCertificateModal,setViewCertificateModal,generateCertificateForCourse,checkoutModalOpen,setCheckoutModalOpen,upgradeToMonthlyPlan,liveSessions,registerLiveSession,
     communityPosts,addCommunityPost,addCommunityReply,togglePostLike,chatThreads,activeChatId,setActiveChatId,sendMessage,notifications,markNotificationAsRead,
     markAllNotificationsAsRead,sendBroadcastNotification,achievements,payments,updatePaymentStatus,submitContact,subscribeNewsletter,toastMessage,showToast

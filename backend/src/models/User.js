@@ -38,6 +38,15 @@ const userSchema = new mongoose.Schema({
   emailVerificationTokenHash: String,
   // One-time token handed out after the email link is opened, so that tab can
   // start a real session instead of sending the person back to the login form.
+  // Result of the programme-wide final assessment. Attempts are capped, so the
+  // count has to survive on the learner record rather than in the browser.
+  masterAssessment: {
+    attempts: { type: Number, default: 0 },
+    bestPercentage: { type: Number, default: 0 },
+    lastPercentage: { type: Number, default: 0 },
+    completed: { type: Boolean, default: false },
+    lastAttemptAt: Date
+  },
   sessionClaimTokenHash: String,
   sessionClaimExpires: Date,
   // Secret handed only to the browser that submitted the registration form, so

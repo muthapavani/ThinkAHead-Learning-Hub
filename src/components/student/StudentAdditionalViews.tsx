@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BookOpen,
   Award,
@@ -38,6 +38,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { api } from '../../services/api';
 import { Course, StudentCourseProgress } from '../../types';
 
 // ==========================================
@@ -236,7 +237,39 @@ export const MyLearningView: React.FC = () => {
 // 2. CERTIFICATES GALLERY VIEW (ONE PROGRAM CERTIFICATE)
 // ==========================================
 export const CertificatesView: React.FC = () => {
-  const { courses, progressMap, certificates, currentUser, theme, setActiveCertificate, setViewCertificateModal, setCurrentView } = useApp();
+  const { courses, progressMap, certificates, currentUser, theme, setActiveCertificate, setViewCertificateModal, setCurrentView, showToast, refreshStudentData } = useApp() as any;
+
+  // The programme-wide assessment that stands between finishing every course
+  // and receiving the certificate.
+  const [assessment, setAssessment] = useState<any>(null);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [taking, setTaking] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadAssessment = async () => {
+    try { const r = await api<any>('/student/final-assessment'); setAssessment(r.assessment); }
+    catch (e: any) { showToast?.(e.message || 'Unable to load the final assessment.'); }
+  };
+  useEffect(() => { void loadAssessment(); }, []);
+
+  const submitAssessment = async () => {
+    const unanswered = (assessment?.questions || []).filter((q: any) => answers[q.id] === undefined);
+    if (unanswered.length) { showToast?.(`Please answer all questions. ${unanswered.length} left.`); return; }
+    setSubmitting(true);
+    try {
+      const r = await api<any>('/student/final-assessment', { method: 'POST', body: JSON.stringify({ answers }) });
+      showToast?.(r.attemptsLeft > 0
+        ? `Scored ${r.result.percentage}%. You may retake it ${r.attemptsLeft} more time(s) to improve.`
+        : `Scored ${r.result.percentage}%. That was your final attempt.`);
+      setTaking(false);
+      setAnswers({});
+      await loadAssessment();
+      await refreshStudentData?.();
+    } catch (e: any) {
+      showToast?.(e.message || 'Could not submit the assessment.');
+      await loadAssessment();
+    } finally { setSubmitting(false); }
+  };
   const completed = courses.filter(course => {
     const p = progressMap[course.id];
     return !!p?.isCompleted || (currentUser?.completedCourseIds || []).includes(course.id);
@@ -251,10 +284,81 @@ export const CertificatesView: React.FC = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-[10px] font-black uppercase tracking-[0.16em]"><Award className="w-3.5 h-3.5" /> Program Certificate</div>
           <h1 className="mt-3 text-2xl sm:text-3xl font-black tracking-tight">My Certificate</h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Complete all courses and pass every final quiz to unlock one certificate for the complete ThinkAHead learning program.</p>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Complete every course, then take the final assessment to unlock your certificate for the complete ThinkAHead learning program.</p>
         </div>
         <button onClick={() => setCurrentView('student-my-learning')} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500 text-white text-xs font-bold shadow-lg">Continue Learning</button>
       </div>
+
+      {/* Final assessment: the last step before the certificate is issued. */}
+      {assessment?.available && (
+        <div className={`rounded-3xl border p-5 sm:p-6 space-y-4 ${theme === 'dark' ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-500">Final Step</div>
+              <h3 className="mt-1 text-base font-black">{assessment.title}</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {assessment.description || `${assessment.questionCount} questions · ${assessment.maxAttempts} attempts · no pass mark, your best score is printed on the certificate.`}
+              </p>
+            </div>
+            {assessment.completed ? (
+              <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0">Completed · best {assessment.bestPercentage}%</span>
+            ) : (
+              <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0">{assessment.attemptsLeft} of {assessment.maxAttempts} attempts left</span>
+            )}
+          </div>
+
+          {!assessment.unlocked && (
+            <div className={`p-4 rounded-2xl border border-dashed text-center ${theme === 'dark' ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-500'}`}>
+              <Lock className="w-5 h-5 mx-auto mb-2 opacity-60" />
+              <div className="text-xs font-bold">Locked</div>
+              <p className="text-[11px] mt-1">You have completed {assessment.completedCourses} of {assessment.totalCourses} courses. Finish the remaining {assessment.coursesRemaining} to unlock this assessment.</p>
+            </div>
+          )}
+
+          {assessment.unlocked && assessment.attemptsLeft <= 0 && (
+            <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300">
+              All {assessment.maxAttempts} attempts used. Your recorded score is {assessment.bestPercentage}%, and it appears on your certificate.
+            </div>
+          )}
+
+          {assessment.unlocked && assessment.attemptsLeft > 0 && !taking && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                {assessment.attemptsUsed > 0
+                  ? `Last attempt: ${assessment.lastPercentage}%. Best so far: ${assessment.bestPercentage}%. Your best score is the one recorded.`
+                  : 'Submitting counts as one of your attempts.'}
+              </p>
+              <button onClick={() => setTaking(true)} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 text-white text-xs font-bold shadow-lg shrink-0">
+                {assessment.attemptsUsed > 0 ? 'Retake to Improve' : 'Start Final Assessment'}
+              </button>
+            </div>
+          )}
+
+          {taking && (
+            <div className="space-y-5 pt-2 border-t border-slate-200 dark:border-slate-800">
+              {(assessment.questions || []).map((q: any, qi: number) => (
+                <div key={q.id} className="space-y-2.5">
+                  <div className="text-xs sm:text-sm font-bold">{qi + 1}. {q.question}</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {(q.options || []).map((opt: string, oi: number) => (
+                      <button key={oi} type="button" onClick={() => setAnswers(a => ({ ...a, [q.id]: oi }))}
+                        className={`text-left px-3 py-2.5 rounded-xl border text-xs transition-all ${
+                          answers[q.id] === oi
+                            ? 'bg-indigo-600 text-white border-indigo-600 font-bold'
+                            : theme === 'dark' ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                        }`}>{opt}</button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-end gap-2">
+                <button onClick={() => { setTaking(false); setAnswers({}); }} className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">Cancel</button>
+                <button disabled={submitting} onClick={() => void submitAssessment()} className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold disabled:opacity-60">{submitting ? 'Submitting…' : 'Submit Assessment'}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={`rounded-3xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
         <div className="h-44 sm:h-56 relative overflow-hidden bg-gradient-to-br from-indigo-900 via-blue-800 to-cyan-700">

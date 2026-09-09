@@ -8,6 +8,7 @@ const Notification=require('../models/Notification');
 const Achievement=require('../models/Achievement');
 const multer=require('multer');
 const Media=require('../models/Media');
+const MasterQuiz=require('../models/MasterQuiz');
 const {requireAuth,requireRole,requireVerifiedEmail}=require('../middleware/auth');
 // Images are held in memory only long enough to store them; nothing touches disk,
 // which matters on hosts with an ephemeral filesystem.
@@ -49,6 +50,48 @@ router.post('/uploads/pdf', pdfUpload.single('file'), async (req,res,next)=>{
       fileSize: media.size>=1048576 ? `${(media.size/1048576).toFixed(1)} MB` : `${Math.max(1,Math.round(media.size/1024))} KB`
     });
   } catch(e){next(e)}
+});
+
+// ---- Programme-wide final assessment -------------------------------------
+router.get('/master-quiz',async(req,res,next)=>{
+  try{ res.json({success:true,masterQuiz:await MasterQuiz.load()}) }catch(e){next(e)}
+});
+
+router.put('/master-quiz',async(req,res,next)=>{
+  try{
+    const doc=await MasterQuiz.load();
+    const b=req.body||{};
+    if(b.title!==undefined) doc.title=String(b.title).trim()||'Final Assessment';
+    if(b.description!==undefined) doc.description=String(b.description);
+    if(b.durationMinutes!==undefined) doc.durationMinutes=Math.max(1,num(b.durationMinutes,30));
+    if(b.maxAttempts!==undefined) doc.maxAttempts=Math.min(10,Math.max(1,num(b.maxAttempts,3)));
+    if(b.published!==undefined) doc.published=b.published===true||b.published==='true';
+    if(Array.isArray(b.questions)){
+      doc.questions=b.questions
+        .filter(q=>String(q.question||'').trim())
+        .map(q=>({
+          id:q.id||`mq-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+          question:String(q.question).trim(),
+          options:(q.options||[]).filter(o=>String(o).trim()!==''),
+          correctAnswer:num(q.correctAnswer,0),
+          explanation:q.explanation||''
+        }));
+    }
+    if(doc.published && !doc.questions.length) return res.status(400).json({success:false,message:'Add at least one question before publishing the final assessment.'});
+    await doc.save();
+    res.json({success:true,masterQuiz:doc,message:'Final assessment saved.'});
+  }catch(e){next(e)}
+});
+
+// Lets an admin clear a learner's attempts if something went wrong.
+router.post('/master-quiz/reset/:userId',async(req,res,next)=>{
+  try{
+    const u=await User.findById(req.params.userId);
+    if(!u) return res.status(404).json({success:false,message:'Learner not found.'});
+    u.masterAssessment={attempts:0,bestPercentage:0,lastPercentage:0,completed:false,lastAttemptAt:undefined};
+    await u.save();
+    res.json({success:true,message:`Final assessment attempts reset for ${u.name}.`});
+  }catch(e){next(e)}
 });
 
 router.post('/uploads/image', imageUpload.single('image'), async (req,res,next)=>{

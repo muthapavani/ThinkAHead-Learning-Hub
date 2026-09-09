@@ -10,6 +10,7 @@ const PAYMENT_CURRENCY=process.env.RAZORPAY_CURRENCY||'INR';
 const today=()=>new Date().toISOString().slice(0,10);
 const User=require('../models/User');
 const Course=require('../models/Course');
+const MasterQuiz=require('../models/MasterQuiz');
 const Progress=require('../models/Progress');
 const Certificate=require('../models/Certificate');
 const LiveSession=require('../models/LiveSession');
@@ -135,6 +136,86 @@ router.post('/progress/:courseId/assignments/:assignmentId',requireCourseAccess,
  await p.save();res.json({success:true,progress:p});
 }catch(e){next(e)}});
 
+// ---- Programme-wide final assessment -------------------------------------
+
+// How many courses are left, how many attempts remain, and the questions
+// themselves once the learner has earned the right to see them.
+async function assessmentState(user){
+  const [quiz,courses,progress]=await Promise.all([
+    MasterQuiz.load(),
+    Course.find().select('id title').lean(),
+    Progress.find({userId:user._id}).lean()
+  ]);
+  const catalogIds=new Set(courses.map(c=>c.id));
+  const done=progress.filter(p=>catalogIds.has(p.courseId)&&p.isCompleted&&p.percent===100&&p.quizResult?.passed);
+  const mine=user.masterAssessment||{};
+  const attemptsUsed=Number(mine.attempts||0);
+  return {
+    quiz,
+    available:quiz.published&&quiz.questions.length>0,
+    totalCourses:courses.length,
+    completedCourses:done.length,
+    coursesRemaining:Math.max(0,courses.length-done.length),
+    unlocked:courses.length>0&&done.length===courses.length,
+    attemptsUsed,
+    attemptsLeft:Math.max(0,Number(quiz.maxAttempts||3)-attemptsUsed),
+    completed:mine.completed===true,
+    bestPercentage:Number(mine.bestPercentage||0),
+    lastPercentage:Number(mine.lastPercentage||0)
+  };
+}
+
+router.get('/final-assessment',async(req,res,next)=>{try{
+  const st=await assessmentState(req.user);
+  // Questions are withheld until it is actually unlocked, and the correct
+  // answers are never sent to the browser.
+  const questions=(st.unlocked&&st.available&&st.attemptsLeft>0)
+    ? st.quiz.questions.map(q=>({id:q.id,question:q.question,options:q.options}))
+    : [];
+  res.json({success:true,assessment:{
+    title:st.quiz.title,description:st.quiz.description,
+    durationMinutes:st.quiz.durationMinutes,passingScorePercentage:st.quiz.passingScorePercentage,
+    maxAttempts:st.quiz.maxAttempts,questionCount:st.quiz.questions.length,
+    available:st.available,unlocked:st.unlocked,
+    totalCourses:st.totalCourses,completedCourses:st.completedCourses,coursesRemaining:st.coursesRemaining,
+    attemptsUsed:st.attemptsUsed,attemptsLeft:st.attemptsLeft,
+    completed:st.completed,bestPercentage:st.bestPercentage,lastPercentage:st.lastPercentage,
+    questions
+  }});
+}catch(e){next(e)}});
+
+router.post('/final-assessment',async(req,res,next)=>{try{
+  const st=await assessmentState(req.user);
+  if(!st.available) return res.status(400).json({success:false,message:'The final assessment has not been published yet.'});
+  if(!st.unlocked) return res.status(403).json({success:false,code:'COURSES_PENDING',message:`Complete all ${st.totalCourses} courses first. ${st.coursesRemaining} still pending.`});
+  if(st.attemptsLeft<=0) return res.status(403).json({success:false,code:'NO_ATTEMPTS_LEFT',message:`You have used all ${st.quiz.maxAttempts} attempts. Your recorded score is ${st.bestPercentage}%.`});
+
+  const answers=req.body.answers||{};
+  let correct=0;
+  for(const q of st.quiz.questions){ if(Number(answers[q.id])===Number(q.correctAnswer)) correct++; }
+  const total=st.quiz.questions.length;
+  const percentage=total?Math.round(correct/total*100):0;
+
+  const u=await User.findById(req.user._id);
+  const prev=u.masterAssessment||{};
+  u.masterAssessment={
+    attempts:Number(prev.attempts||0)+1,
+    bestPercentage:Math.max(Number(prev.bestPercentage||0),percentage),
+    lastPercentage:percentage,
+    // Finishing the assessment is enough; the score is recorded, not judged.
+    completed:true,
+    lastAttemptAt:new Date()
+  };
+  await u.save();
+
+  const attemptsLeft=Math.max(0,Number(st.quiz.maxAttempts||3)-u.masterAssessment.attempts);
+  if(!prev.completed){
+    void notifyUser(u._id,{category:'Certificates',title:'Final assessment completed',message:`You scored ${percentage}%. Your certificate is being generated.`,actionUrl:'/student/certificates',source:'final_assessment'});
+    void sendAdminNotification('Final assessment completed', `<p><strong>${u.name}</strong> completed the final assessment with ${percentage}%.</p>`, `${u.name} completed the final assessment with ${percentage}%.`);
+  }
+  res.json({success:true,result:{score:correct,total,percentage},attemptsLeft,attemptsUsed:u.masterAssessment.attempts,bestPercentage:u.masterAssessment.bestPercentage});
+}catch(e){next(e)}});
+
 router.post('/progress/:courseId/quiz',requireCourseAccess,async(req,res,next)=>{try{
  const course=req.course;
  const phase=req.body.phase==='starting'?'starting':'final';
@@ -186,14 +267,19 @@ router.post('/progress/:courseId/quiz',requireCourseAccess,async(req,res,next)=>
    ]);
    const catalogIds=new Set(allCourses.map(c=>c.id));
    const completedFinals=allProgress.filter(x=>catalogIds.has(x.courseId) && x.isCompleted && x.percent===100 && x.quizResult?.passed);
-   if(allCourses.length>0 && completedFinals.length===allCourses.length){
+   // Every course finished is only half the gate. The certificate is issued
+   // once the programme-wide final assessment has also been completed.
+   const masterQuiz=await MasterQuiz.load();
+   const assessmentRequired=masterQuiz.published && masterQuiz.questions.length>0;
+   const assessmentDone=!assessmentRequired || u.masterAssessment?.completed===true;
+   if(allCourses.length>0 && completedFinals.length===allCourses.length && assessmentDone){
      const scoreRows=allCourses.map(c=>{
        const row=completedFinals.find(x=>x.courseId===c.id);
        return row?.quizResult ? {courseId:c.id,courseTitle:c.title,score:Number(row.quizResult.score||0),total:Number(row.quizResult.total||0),percentage:Number(row.quizResult.percentage||0)} : null;
      }).filter(Boolean);
      const overallAssessmentScore=scoreRows.length ? Math.round(scoreRows.reduce((sum,row)=>sum+row.percentage,0)/scoreRows.length) : 0;
      const certificateNumber=`IHCDR-MASTER-2026-HC22-${u._id.toString().slice(-6).toUpperCase()}`;
-     const certData={studentName:u.name,studentEmail:u.email,courseName:`ThinkAHead Complete Learning Certificate — ${allCourses.length} Courses`,issueDate:today(),qrCodeUrl:`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://ihcdr.org/verify/${certificateNumber}`,directorName:'Prof. Dr. A. K. Sharma',founderName:'G. Satyanarayana',verified:true,overallAssessmentScore,assessmentScores:scoreRows};
+     const certData={studentName:u.name,studentEmail:u.email,courseName:`ThinkAHead Complete Learning Certificate — ${allCourses.length} Courses`,issueDate:today(),qrCodeUrl:`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://ihcdr.org/verify/${certificateNumber}`,directorName:'Prof. Dr. A. K. Sharma',founderName:'G. Satyanarayana',verified:true,overallAssessmentScore,finalAssessmentScore:Number(u.masterAssessment?.bestPercentage||0),finalAssessmentDate:u.masterAssessment?.lastAttemptAt?new Date(u.masterAssessment.lastAttemptAt).toISOString().slice(0,10):today(),assessmentScores:scoreRows};
      const certificateExisted=await Certificate.findOne({userId:u._id,courseId:'all-22-capabilities-master'});
      certificate=certificateExisted;
      if(!certificate) certificate=await Certificate.create({id:`master-${u._id}`,certificateNumber,userId:u._id,courseId:'all-22-capabilities-master',...certData});
