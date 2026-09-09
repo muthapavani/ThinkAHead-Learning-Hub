@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ThemeToggle } from '../common/ThemeToggle';
-import { StudentAvatar } from '../common/StudentAvatar';
 
 export const AdminHeader: React.FC<{ title?: string; onMenuClick?: () => void; sidebarOpen?: boolean }> = ({ title = 'ThinkAHead Admin', onMenuClick, sidebarOpen }) => {
   const { logout,
@@ -147,8 +146,9 @@ export const AdminHeader: React.FC<{ title?: string; onMenuClick?: () => void; s
             aria-label="Open profile menu"
             title="Open profile menu"
           >
-            <span className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-1 ring-slate-300/40 dark:ring-slate-700 hover:ring-cyan-400/70 transition-all">
-              <StudentAvatar name={currentUser?.name} avatar={currentUser?.avatar} className="w-full h-full rounded-full object-cover" />
+            {/* Initials rather than a photo: admins manage their own image. */}
+            <span className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden ring-1 ring-slate-300/40 dark:ring-slate-700 hover:ring-cyan-400/70 transition-all bg-gradient-to-br from-indigo-600 to-cyan-500 text-white flex items-center justify-center text-xs font-black">
+              {(currentUser?.name || 'A').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
             </span>
           </button>
 
