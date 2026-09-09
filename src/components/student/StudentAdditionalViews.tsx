@@ -81,6 +81,9 @@ export const MyLearningView: React.FC = () => {
 
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-7xl mx-auto">
+      <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+        <ArrowLeft className="w-4 h-4" /> Back to Learning
+      </button>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">My Learning Hub</h1>
@@ -280,6 +283,9 @@ export const CertificatesView: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-7 max-w-5xl mx-auto">
+      <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+        <ArrowLeft className="w-4 h-4" /> Back to Learning
+      </button>
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-[10px] font-black uppercase tracking-[0.16em]"><Award className="w-3.5 h-3.5" /> Program Certificate</div>
@@ -393,11 +399,14 @@ export const CertificatesView: React.FC = () => {
 // 3. ANNUAL MEMBERSHIP & SUBSCRIPTION VIEW
 // ==========================================
 export const SubscriptionView: React.FC = () => {
-  const { currentUser, setCheckoutModalOpen, theme, courses, isCourseUnlocked, subscriptionUnlockedMonths } = useApp();
+  const { currentUser, setCheckoutModalOpen, theme, courses, isCourseUnlocked, subscriptionUnlockedMonths, setCurrentView } = useApp();
   const active = subscriptionUnlockedMonths > 0;
   const accessibleCount = courses.filter(c => isCourseUnlocked(c)).length;
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-7 max-w-7xl mx-auto">
+      <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+        <ArrowLeft className="w-4 h-4" /> Back to Learning
+      </button>
       <div><div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-[0.16em]"><CreditCard className="w-3.5 h-3.5" /> Annual Membership</div><h1 className="mt-3 text-2xl sm:text-3xl font-black tracking-tight">Complete Annual Learning Membership</h1><p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">One annual plan. Full access to the capability curriculum, learning resources, quizzes and verified credentials.</p></div>
       <div className={`relative overflow-hidden rounded-3xl border p-6 sm:p-8 ${theme === 'dark' ? 'bg-gradient-to-br from-[#0b1020] via-[#121a30] to-[#0d1222] border-indigo-500/30 text-white' : 'bg-gradient-to-br from-indigo-50 via-white to-slate-50 border-indigo-200 text-slate-900 shadow-sm'}`}>
         <div className="grid lg:grid-cols-12 gap-7 items-center relative">
@@ -427,10 +436,13 @@ export const SubscriptionView: React.FC = () => {
 // 4. LIVE MASTERCLASSES VIEW
 // ==========================================
 export const LiveSessionsView: React.FC = () => {
-  const { liveSessions, registerLiveSession, theme } = useApp();
+  const { liveSessions, registerLiveSession, theme, setCurrentView } = useApp();
 
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-7xl mx-auto">
+      <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+        <ArrowLeft className="w-4 h-4" /> Back to Learning
+      </button>
       <div>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-400 text-xs font-bold mb-2">
           <Video className="w-3.5 h-3.5" />
@@ -534,7 +546,7 @@ export const LiveSessionsView: React.FC = () => {
 // 5. COMMUNITY & DISCUSSION FORUM VIEW
 // ==========================================
 export const CommunityView: React.FC = () => {
-  const { communityPosts, addCommunityPost, addCommunityReply, togglePostLike, theme } = useApp();
+  const { communityPosts, addCommunityPost, addCommunityReply, togglePostLike, theme, setCurrentView } = useApp();
 
   const [newPostTitle, setNewPostTitle] = useState('');
   const [newPostCategory, setNewPostCategory] = useState('Leadership & EQ');
@@ -560,6 +572,9 @@ export const CommunityView: React.FC = () => {
 
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-5xl mx-auto">
+      <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+        <ArrowLeft className="w-4 h-4" /> Back to Learning
+      </button>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-bold mb-2">
@@ -739,7 +754,7 @@ export const CommunityView: React.FC = () => {
 // 6. RESOURCES & HANDBOOKS VIEW
 // ==========================================
 export const ResourcesView: React.FC = () => {
-  const { courses, theme, showToast } = useApp();
+  const { courses, theme, showToast, setCurrentView } = useApp();
 
   const allResources = courses.flatMap(c =>
     (c.resources || []).filter(r => r.published === true).map(r => ({ ...r, courseTitle: c.title, courseCategory: c.category }))
@@ -747,6 +762,9 @@ export const ResourcesView: React.FC = () => {
 
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-7xl mx-auto">
+      <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+        <ArrowLeft className="w-4 h-4" /> Back to Learning
+      </button>
       <div>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold mb-2">
           <FileText className="w-3.5 h-3.5" />
@@ -809,10 +827,13 @@ export const ResourcesView: React.FC = () => {
 // 7. ACHIEVEMENTS & GAMIFICATION VIEW
 // ==========================================
 export const AchievementsView: React.FC = () => {
-  const { achievements, currentUser, theme } = useApp();
+  const { achievements, currentUser, theme, setCurrentView } = useApp();
 
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-7xl mx-auto">
+      <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+        <ArrowLeft className="w-4 h-4" /> Back to Learning
+      </button>
       <div>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 text-xs font-bold mb-2">
           <Trophy className="w-3.5 h-3.5" />
@@ -1013,7 +1034,7 @@ export const ProgressView: React.FC = () => {
 };
 
 export const ProfileView: React.FC = () => {
-  const { currentUser, theme, updateProfile, uploadProfilePhoto, showToast } = useApp();
+  const { currentUser, theme, updateProfile, uploadProfilePhoto, showToast, setCurrentView } = useApp();
   const isAdmin = currentUser?.role === 'admin';
   const [name, setName] = useState(currentUser?.name || '');
   const [phone, setPhone] = useState(currentUser?.phone || '');
@@ -1059,6 +1080,9 @@ export const ProfileView: React.FC = () => {
 
   return (
     <div className="min-h-full px-4 py-6 sm:px-8 sm:py-8">
+      <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+        <ArrowLeft className="w-4 h-4" /> Back to Learning
+      </button>
       <div className="max-w-5xl mx-auto">
         {/* Profile hero — centered like a polished real-world account page */}
         <section className={`relative overflow-hidden rounded-[2rem] shadow-2xl ${
@@ -1244,7 +1268,7 @@ export const SettingsView: React.FC = () => {
 // 9. MESSAGES & MENTOR CHAT VIEW
 // ==========================================
 export const MessagesView: React.FC = () => {
-  const { chatThreads, activeChatId, setActiveChatId, sendMessage, theme } = useApp();
+  const { chatThreads, activeChatId, setActiveChatId, sendMessage, theme, setCurrentView } = useApp();
 
   const [inputMsg, setInputMsg] = useState('');
   const activeThread = chatThreads.find(t => t.id === activeChatId) || chatThreads[0];
@@ -1269,6 +1293,9 @@ export const MessagesView: React.FC = () => {
 
   return (
     <div className="p-6 sm:p-8 max-w-6xl mx-auto h-[calc(100vh-5rem)] flex flex-col">
+      <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+        <ArrowLeft className="w-4 h-4" /> Back to Learning
+      </button>
       <div className="mb-4">
         <h1 className="text-2xl font-black tracking-tight">Mentor & Support Chat</h1>
         <p className="text-xs text-slate-400">Direct asynchronous channel with IHCDR executive mentors.</p>
