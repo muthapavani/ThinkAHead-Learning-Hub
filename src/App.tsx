@@ -174,7 +174,7 @@ export default function App() {
             {currentView === 'admin-notifications' && <AdminNotificationsView />}
             {currentView === 'admin-analytics' && <AdminAnalyticsView />}
             {currentView === 'admin-profile' && <ProfileView />}
-            {(currentView === 'admin-settings' || currentView === 'admin-videos' || currentView === 'admin-resources') && <AdminSettingsView />}
+            {(currentView === 'admin-settings' || currentView === 'admin-final-assessment' || currentView === 'admin-videos' || currentView === 'admin-resources') && <AdminSettingsView />}
           </main>
         </div>
 

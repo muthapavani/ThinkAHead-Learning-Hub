@@ -1217,7 +1217,10 @@ export const AdminAnalyticsView: React.FC = () => {
 // 9. ADMIN SETTINGS
 // ==========================================
 export const AdminSettingsView: React.FC = () => {
-  const { theme, showToast } = useApp();
+  const { theme, showToast, currentView } = useApp();
+  // The sidebar has two entries pointing here. "Final Assessment" shows only
+  // the assessment editor so it is not buried below the portal settings.
+  const assessmentOnly = currentView === 'admin-final-assessment';
 
   // The programme-wide final assessment lives here rather than inside a course,
   // because it is taken once, after every course is finished.
@@ -1261,14 +1264,16 @@ export const AdminSettingsView: React.FC = () => {
   return (
     <div className="p-6 sm:p-8 space-y-8 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Portal Configuration</h1>
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{assessmentOnly ? 'Final Assessment' : 'Portal Configuration'}</h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Institute parameters, payment gateway keys, and certificate signing authority.
+          {assessmentOnly
+            ? 'The single assessment learners take after finishing every course. Completing it issues their certificate.'
+            : 'Institute parameters, payment gateway keys, and certificate signing authority.'}
         </p>
       </div>
 
       <div className={`p-6 sm:p-8 rounded-3xl border space-y-6 ${theme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'}`}>
-        <div className="space-y-4">
+        <div className={`space-y-4 ${assessmentOnly ? 'hidden' : ''}`}>
           <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Certifying Authority Settings</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
@@ -1290,10 +1295,10 @@ export const AdminSettingsView: React.FC = () => {
           </div>
         </div>
 
-        <div className="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-4">
+        <div className={`space-y-4 ${assessmentOnly ? '' : 'pt-6 border-t border-slate-200 dark:border-slate-800'}`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Final Assessment</h3>
+              <h3 className={`text-base font-bold text-slate-900 dark:text-slate-100 ${assessmentOnly ? 'hidden' : ''}`}>Final Assessment</h3>
               <p className="text-[11px] text-slate-400 mt-1">Taken once, after every course is complete. Finishing it issues the certificate, and the score is printed on it. There is no pass mark.</p>
             </div>
             {mq && (
@@ -1344,7 +1349,7 @@ export const AdminSettingsView: React.FC = () => {
           </>}
         </div>
 
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+        <div className={`pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end ${assessmentOnly ? 'hidden' : ''}`}>
           <button
             onClick={() => { void api('/admin/settings', { method: 'PATCH', body: JSON.stringify({ certificateDirectorName: 'G. Satyanarayana', instituteName: 'The Institute of Human Capability Development and Research' }) }).then(() => showToast('Portal configuration saved.')).catch((e:any) => showToast(e.message)); }}
             className="px-6 py-2.5 rounded-xl font-bold text-xs text-white bg-rose-600 hover:bg-rose-500 shadow-md shadow-rose-600/30"
@@ -1356,3 +1361,7 @@ export const AdminSettingsView: React.FC = () => {
     </div>
   );
 };
+
+// Same page, reached from the sidebar's "Final Assessment" entry so the
+// programme-wide assessment is easy to find.
+export const AdminFinalAssessmentView: React.FC = () => <AdminSettingsView />;

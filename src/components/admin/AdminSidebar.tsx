@@ -8,6 +8,7 @@ import {
   Bell,
   BarChart3,
   Settings,
+  ClipboardCheck,
   LogOut,
   ShieldCheck,
   Sparkles,
@@ -56,6 +57,11 @@ export const AdminSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = 
       label: 'Capability Analytics',
       view: 'admin-analytics',
       icon: <BarChart3 className="w-4 h-4" />
+    },
+    {
+      label: 'Final Assessment',
+      view: 'admin-final-assessment',
+      icon: <ClipboardCheck className="w-4 h-4" />
     },
     {
       label: 'Portal Settings',

@@ -13,7 +13,7 @@ export type AppView =
   | 'student-notifications' | 'student-settings' | 'student-profile' | 'student-resources' | 'student-help'
   | 'admin-dashboard' | 'admin-students' | 'admin-courses' | 'admin-videos' | 'admin-resources'
   | 'admin-subscriptions' | 'admin-certificates' | 'admin-notifications'
-  | 'admin-analytics' | 'admin-settings' | 'admin-profile';
+  | 'admin-analytics' | 'admin-settings' | 'admin-final-assessment' | 'admin-profile';
 
 interface AppContextType {
   theme: ThemeMode; setTheme: (theme: ThemeMode) => void; toggleTheme: () => void;

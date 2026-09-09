@@ -140,94 +140,90 @@ export const MyLearningView: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {displayedCourses.map(course => {
             const prog = progressMap[course.id] || { percent: 0, completedLessonIds: [], isCompleted: false };
             const isCompleted = prog.isCompleted;
+            const started = prog.percent > 0;
+            const lessonsDone = prog.completedLessonIds.length;
 
             return (
-              <div
+              <article
                 key={course.id}
-                className={`rounded-3xl border overflow-hidden flex flex-col justify-between transition-all hover:scale-[1.01] ${
+                className={`group relative flex flex-col rounded-2xl border overflow-hidden transition-colors ${
                   theme === 'dark'
-                    ? 'bg-slate-900/80 border-slate-800 hover:border-indigo-500/50'
-                    : 'bg-white border-slate-200 shadow-sm hover:shadow-lg'
+                    ? 'bg-slate-900/70 border-slate-800 hover:border-slate-600'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
                 }`}
               >
-                <div>
-                  <div className="relative aspect-video overflow-hidden">
-                    <img
-                      src={course.thumbnail}
-                      alt={course.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
-                    <div className="absolute top-3 left-3">
-                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white border border-white/20">
-                        {course.category}
-                      </span>
-                    </div>
+                {/* A finished course is marked by a coloured edge rather than a
+                    badge pasted over the artwork. */}
+                {isCompleted && <span className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 z-10" />}
 
-                    {isCompleted && (
-                      <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-black text-[10px] flex items-center gap-1 shadow-md">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Completed
-                      </div>
-                    )}
+                <div className="aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-slate-800">
+                  <img src={course.thumbnail} alt="" loading="lazy" className="w-full h-full object-cover" />
+                </div>
 
-                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white">
-                      <span className="text-[11px] font-mono">{prog.completedLessonIds.length} / {course.lessonsCount} Lessons</span>
-                      <span className="font-mono font-black text-cyan-400">{prog.percent}%</span>
-                    </div>
+                <div className="flex flex-col flex-1 p-5 gap-3">
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className={`px-2 py-0.5 rounded-md font-semibold ${theme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{course.category}</span>
+                    {isCompleted
+                      ? <span className="font-semibold text-emerald-600 dark:text-emerald-400">Completed</span>
+                      : started
+                      ? <span className="font-semibold text-indigo-600 dark:text-indigo-400">In progress</span>
+                      : <span className="text-slate-400">Not started</span>}
                   </div>
 
-                  <div className="p-5 space-y-3">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 line-clamp-1">{course.title}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                      {course.shortDescription}
-                    </p>
+                  <h3 className="text-[17px] leading-snug font-semibold tracking-[-0.01em] text-slate-900 dark:text-slate-50 line-clamp-2">
+                    {course.title}
+                  </h3>
+                  <p className="text-[13px] leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2">
+                    {course.shortDescription}
+                  </p>
 
-                    {/* Progress Bar */}
-                    <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div className="mt-auto pt-3 space-y-2.5">
+                    <div className="flex items-baseline justify-between text-[12px]">
+                      <span className="text-slate-500 dark:text-slate-400">{lessonsDone} of {course.lessonsCount} lessons</span>
+                      <span className="tabular-nums font-semibold text-slate-900 dark:text-slate-100">{prog.percent}%</span>
+                    </div>
+                    <div className="h-[3px] rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all ${
-                          isCompleted
-                            ? 'bg-emerald-500'
-                            : 'bg-gradient-to-r from-blue-500 to-indigo-500'
-                        }`}
-                        style={{ width: `${prog.percent}%` }}
+                        className={`h-full rounded-full transition-[width] duration-500 ${isCompleted ? 'bg-emerald-500' : 'bg-indigo-600'}`}
+                        style={{ width: `${Math.max(prog.percent, started ? 3 : 0)}%` }}
                       />
                     </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => { setSelectedCourseId(course.id); setCurrentView('student-player'); }}
+                        className={`flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-colors ${
+                          started && !isCompleted
+                            ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                            : theme === 'dark'
+                            ? 'bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700'
+                            : 'bg-slate-900 hover:bg-slate-800 text-white'
+                        }`}
+                      >
+                        {isCompleted ? 'Review course' : started ? 'Continue' : 'Start course'}
+                      </button>
+
+                      {isCompleted && (
+                        <button
+                          onClick={() => {
+                            const cert = certificates.find(c => c.courseId === course.id) || certificates[0];
+                            setActiveCertificate(cert);
+                            setViewCertificateModal(true);
+                          }}
+                          className="px-3 rounded-xl border border-amber-400/50 text-amber-600 dark:text-amber-400 hover:bg-amber-400/10 transition-colors"
+                          title="View certificate"
+                        >
+                          <Award className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                <div className="p-5 pt-0 flex gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedCourseId(course.id);
-                      setCurrentView('student-player');
-                    }}
-                    className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <span>{isCompleted ? 'Learn Again' : 'Resume Learning'}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-
-                  {isCompleted && (
-                    <button
-                      onClick={() => {
-                        const cert = certificates.find(c => c.courseId === course.id) || certificates[0];
-                        setActiveCertificate(cert);
-                        setViewCertificateModal(true);
-                      }}
-                      className="p-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 transition-colors"
-                      title="View Certificate"
-                    >
-                      <Award className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
+              </article>
             );
           })}
         </div>
