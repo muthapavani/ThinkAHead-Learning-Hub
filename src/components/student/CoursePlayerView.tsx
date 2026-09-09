@@ -542,7 +542,9 @@ export const CoursePlayerView: React.FC = () => {
 
             {/* TAB CONTENT: QUIZZES */}
             {activeTab === 'quizzes' && (
-              <div className="space-y-5">
+              // Side by side so the final quiz is visible without scrolling past
+              // the starting one. Stacks on narrow screens.
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
               <div className="pt-1">
                 {renderQuizSection('starting', startingQuizAnswers, setStartingQuizAnswers, startingQuizSubmitted, startingQuizScore)}
               </div>
