@@ -37,7 +37,7 @@ export const StudentSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> 
       icon: <Compass className="w-4 h-4" />
     },
     {
-      label: 'Certificates',
+      label: 'Assessment & Certificate',
       view: 'student-certificates',
       icon: <Award className="w-4 h-4" />
     },
@@ -175,4 +175,3 @@ export const StudentSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> 
     </>
   );
 };
-
