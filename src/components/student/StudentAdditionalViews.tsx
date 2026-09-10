@@ -1081,10 +1081,13 @@ export const ProfileView: React.FC = () => {
 
   return (
     <div className="min-h-full px-4 py-6 sm:px-8 sm:py-8">
-      {/* Admins land here too, so send them back where they came from. */}
-      <button onClick={() => setCurrentView(isAdmin ? 'admin-dashboard' : 'student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
-        <ArrowLeft className="w-4 h-4" /> {isAdmin ? 'Back to Overview' : 'Back to Learning'}
-      </button>
+      {/* Admins already get a Back to Overview button from the admin shell,
+          so this one is only rendered for learners. */}
+      {!isAdmin && (
+        <button onClick={() => setCurrentView('student-dashboard')} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 ring-1 ring-cyan-400/30 shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:via-cyan-400 hover:to-blue-500 transition-all">
+          <ArrowLeft className="w-4 h-4" /> Back to Learning
+        </button>
+      )}
       <div className="max-w-5xl mx-auto">
         {/* Profile hero — centered like a polished real-world account page */}
         <section className={`relative overflow-hidden rounded-[2rem] shadow-2xl ${
