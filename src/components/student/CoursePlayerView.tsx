@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Play,
   Pause,
@@ -71,6 +71,18 @@ export const CoursePlayerView: React.FC = () => {
     setFinalQuizSubmitted(!!saved?.quizResult);
   }, [selectedCourseId, progressMap]);
 
+  // Nudge the learner to take the starting quiz the first time they open a
+  // course. Shown once per course per visit, never after it has been answered.
+  useEffect(() => {
+    const saved = progressMap[selectedCourseId];
+    const hasStartingQuiz = ((currentCourse as any)?.startingQuiz?.questions?.length
+      || (currentCourse as any)?.quiz?.questions?.length || 0) > 0;
+    if (!hasStartingQuiz || saved?.startingQuizResult) return;
+    if (promptedFor.current === selectedCourseId) return;
+    promptedFor.current = selectedCourseId;
+    setShowStartingPrompt(true);
+  }, [selectedCourseId, progressMap, currentCourse]);
+
   // Active module & lesson tracking
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   const [showCompletionCelebration, setShowCompletionCelebration] = useState(false);
@@ -88,6 +100,8 @@ export const CoursePlayerView: React.FC = () => {
   // Quiz state
   const [startingQuizAnswers, setStartingQuizAnswers] = useState<Record<string, number>>({});
   const [startingQuizSubmitted, setStartingQuizSubmitted] = useState(false);
+  const [showStartingPrompt, setShowStartingPrompt] = useState(false);
+  const promptedFor = useRef<string | null>(null);
   const [startingQuizScore, setStartingQuizScore] = useState<number | null>(null);
   const [finalQuizAnswers, setFinalQuizAnswers] = useState<Record<string, number>>({});
   const [finalQuizSubmitted, setFinalQuizSubmitted] = useState(false);
@@ -391,6 +405,39 @@ export const CoursePlayerView: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Starting-quiz prompt, shown over the player when the course opens. */}
+      {showStartingPrompt && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4"
+             onClick={e => { if (e.target === e.currentTarget) setShowStartingPrompt(false); }}>
+          <div className={`w-full max-w-md rounded-3xl border shadow-2xl overflow-hidden ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+            <div className="h-1.5 bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400" />
+            <div className="p-6 text-center">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                <ClipboardCheck className="w-6 h-6" />
+              </div>
+              <h3 className="mt-3 text-lg font-black">Start with a quick check</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                Take the starting quiz before your first lesson. It only measures where you are today, so there is no pass mark — you will see how far you have come when you take the final quiz.
+              </p>
+              <div className="mt-5 flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={() => { setShowStartingPrompt(false); setActiveTab('quizzes'); }}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-black text-white bg-gradient-to-r from-indigo-600 via-cyan-500 to-blue-600 shadow-lg shadow-indigo-500/25"
+                >
+                  Take Starting Quiz
+                </button>
+                <button
+                  onClick={() => setShowStartingPrompt(false)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${theme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}
+                >
+                  Maybe later
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Workspace Grid */}
       <div className="flex flex-col max-w-[1100px] mx-auto w-full">
